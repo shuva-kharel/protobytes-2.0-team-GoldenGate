@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+    --color-valentine-primary: #ff4d6d;
+    --color-valentine-secondary: #ff8fa3;
+    --color-valentine-accent: #ffb3c1;
+    --color-valentine-bg: #fff0f3;
+    --color-valentine-dark: #590d22;
+    --color-valentine-light: #fff5f6;
+
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+:root {
+    --valentine-primary: var(--color-valentine-primary);
+    --valentine-secondary: var(--color-valentine-secondary);
+    --valentine-bg: var(--color-valentine-bg);
+    --valentine-text: var(--color-valentine-dark);
+}
+
+body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--valentine-bg);
+    color: var(--valentine-text);
+    font-family: var(--font-sans);
+}
+
+@layer base {
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-weight: 700;
+        color: var(--color-valentine-dark);
+    }
+}
+
+@layer components {
+    .glass-card {
+        background-color: rgb(255 255 255 / 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgb(255 255 255 / 0.2);
+        box-shadow: var(--shadow-xl);
+    }
+
+    .btn-primary {
+        background-color: var(--color-valentine-primary);
+        color: white;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        border-radius: 9999px;
+        transition-property: all;
+        transition-duration: 300ms;
+        box-shadow: var(--shadow-md);
+    }
+
+    .btn-primary:hover {
+        background-color: var(--color-valentine-dark);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .btn-primary:active {
+        scale: 0.95;
+    }
+
+    .btn-secondary {
+        background-color: white;
+        color: var(--color-valentine-primary);
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        border-radius: 9999px;
+        border: 1px solid var(--color-valentine-accent);
+        transition-property: all;
+        transition-duration: 300ms;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--color-valentine-accent);
+        box-shadow: var(--shadow-md);
+    }
+
+    .btn-secondary:active {
+        scale: 0.95;
+    }
+}
