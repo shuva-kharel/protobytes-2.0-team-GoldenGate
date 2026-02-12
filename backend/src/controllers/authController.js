@@ -49,8 +49,7 @@ function clear2FACookie(res) {
 // ─────────────────────────────────────────────
 const registerUser = async (req, res, next) => {
   try {
-    const { username, email, password, role } = req.body;
-
+    const { username, fullName, email, password, role } = req.body;
     const userExists = await User.findOne({ email: (email || "").toLowerCase() });
     if (userExists) return res.status(400).json({ message: "User already exists" });
 
@@ -58,6 +57,7 @@ const registerUser = async (req, res, next) => {
 
     const user = await User.create({
       username,
+      fullName,
       email: email.toLowerCase(),
       password,
       role: role && ["admin", "user"].includes(role) ? role : "user",
@@ -80,6 +80,7 @@ const registerUser = async (req, res, next) => {
     res.status(201).json({
       _id: user._id,
       username: user.username,
+      fullName: user.fullName,
       email: user.email,
       role: user.role,
       isEmailVerified: user.isEmailVerified,

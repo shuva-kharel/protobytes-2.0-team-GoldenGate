@@ -12,6 +12,7 @@ function handleValidation(req, res, next) {
 
 exports.registerValidator = [
   body("username").isString().trim().isLength({ min: 3 }).withMessage("Username min 3 chars"),
+  body("fullName").isString().trim().isLength({ min: 3 }).withMessage("Full name must be at least 3 characters"),
   body("email").isEmail().withMessage("Valid email required"),
   body("password").isStrongPassword({ minLength: 8 }).withMessage("Password must be strong (min 8 chars, upper/lower/number/symbol)"),
   handleValidation,

@@ -20,7 +20,9 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const kycRoutes = require("./routes/kycRoutes");
 const adminRoutes = require("./routes/adminRoutes");
-
+const productRoutes = require("./routes/productRoutes");
+const borrowRoutes = require("./routes/borrowRoutes");
+const productRequestRoutes = require("./routes/productRequestRoutes");
 
 const deviceMiddleware = require("./middlewares/deviceMiddleware");
 const errorHandler = require("./middlewares/errorHandler");
@@ -115,7 +117,9 @@ app.use("/api/user", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/kyc", kycRoutes);
 app.use("/api/admin", adminRoutes);
-
+app.use("/api/products", productRoutes);
+app.use("/api/borrow", borrowRoutes);
+app.use("/api/product-requests", productRequestRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Server is running 🚀" });
@@ -126,6 +130,7 @@ app.use(errorHandler);
 
 // DeviceMiddleware
 app.use(deviceMiddleware);
+
 
 // SMTP verify (optional)
 transporter
