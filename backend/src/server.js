@@ -15,7 +15,14 @@ const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
 
 const connectDB = require("./config/db");
+
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
+const kycRoutes = require("./routes/kycRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+
+
+const deviceMiddleware = require("./middlewares/deviceMiddleware");
 const errorHandler = require("./middlewares/errorHandler");
 const logger = require("./utils/logger");
 const transporter = require("./config/mailer");
@@ -51,6 +58,7 @@ app.use(hpp());
 // Parsers
 app.use(express.json());
 app.use(cookieParser());
+app.use("/uploads", express.static("uploads"));
 
 /**
  * Express 5–safe sanitizer
@@ -103,7 +111,11 @@ app.use("/api/auth", authLimiter);
 connectDB();
 
 // Routes
+app.use("/api/user", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/kyc", kycRoutes);
+app.use("/api/admin", adminRoutes);
+
 
 app.get("/", (req, res) => {
   res.json({ message: "Server is running 🚀" });
@@ -111,6 +123,9 @@ app.get("/", (req, res) => {
 
 // Error handler last
 app.use(errorHandler);
+
+// DeviceMiddleware
+app.use(deviceMiddleware);
 
 // SMTP verify (optional)
 transporter

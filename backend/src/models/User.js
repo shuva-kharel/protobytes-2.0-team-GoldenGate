@@ -29,6 +29,15 @@ const userSchema = new mongoose.Schema(
     // Password reset
     passwordResetToken: { type: String, default: null },
     passwordResetExpires: { type: Date, default: null },
+
+    // About
+    profilePicture: {
+      url: { type: String, default: "" },
+      publicId: { type: String, default: "" },
+    },
+    fullName: { type: String, default: "" },
+    bio: { type: String, default: "" },
+    username: { type: String, required: true, unique: true, trim: true },
   },
   { timestamps: true }
 );

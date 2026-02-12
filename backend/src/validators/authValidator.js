@@ -9,6 +9,7 @@ function handleValidation(req, res, next) {
   next();
 }
 
+
 exports.registerValidator = [
   body("username").isString().trim().isLength({ min: 3 }).withMessage("Username min 3 chars"),
   body("email").isEmail().withMessage("Valid email required"),
@@ -16,11 +17,39 @@ exports.registerValidator = [
   handleValidation,
 ];
 
+
 exports.loginValidator = [
-  body("email").isEmail().withMessage("Valid email required"),
-  body("password").isString().notEmpty().withMessage("Password is required"),
+  body("login")
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage("Login (email or username) is required")
+    .custom((value) => {
+      const v = value.trim();
+
+      // If it looks like an email -> validate as email
+      if (v.includes("@")) {
+        // simple email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(v)) throw new Error("Valid email required");
+        return true;
+      }
+
+      // Otherwise validate username
+      // You can adjust these rules
+      if (v.length < 3) throw new Error("Username must be at least 3 characters");
+      if (!/^[a-zA-Z0-9_]+$/.test(v)) throw new Error("Username can contain only letters, numbers, underscore");
+      return true;
+    }),
+
+  body("password")
+    .isString()
+    .notEmpty()
+    .withMessage("Password is required"),
+
   handleValidation,
 ];
+
 
 exports.emailOnlyValidator = [
   body("email").isEmail().withMessage("Valid email required"),

@@ -15,6 +15,7 @@ const {
   logoutUser,
   getProfile,
   updatePassword,           // <-- ADD
+
 } = require("../controllers/authController");
 
 const { protect, requireRole } = require("../middlewares/authMiddleware");
