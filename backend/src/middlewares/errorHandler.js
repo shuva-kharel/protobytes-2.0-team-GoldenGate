@@ -1,6 +1,9 @@
-// middlewares/errorHandler.js
+const logger = require("../utils/logger");
+
 module.exports = (err, req, res, next) => {
-  console.error(err); // log once
+  logger.error(err.message, { stack: err.stack });
   if (res.headersSent) return next(err);
-  res.status(err.status || 500).json({ message: err.message || "Server error" });
+  const status = err.status || 500;
+  const message = err.expose ? err.message : (err.message || "Server error");
+  res.status(status).json({ message });
 };

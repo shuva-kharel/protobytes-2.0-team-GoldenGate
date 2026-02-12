@@ -1,4 +1,3 @@
-// models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -13,15 +12,28 @@ const userSchema = new mongoose.Schema(
     username: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
+
+    // Email verification
     isEmailVerified: { type: Boolean, default: false, index: true },
     emailVerifiedAt: { type: Date, default: null },
-    twoFactorEnabled: { type: Boolean, default: false },
+
+    // Roles
+    role: { type: String, enum: ["admin", "user"], default: "user", index: true },
+
+    // 2FA for login
+    twoFactor: { type: otpSchema, default: () => ({}) },
+
+    // Account verification OTP (register flow)
     otp: { type: otpSchema, default: () => ({}) },
+
+    // Password reset
+    passwordResetToken: { type: String, default: null },
+    passwordResetExpires: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
-// IMPORTANT: use a normal function to keep `this`, but don't take `next` when async
+// Hash password on change
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
   const salt = await bcrypt.genSalt(10);
