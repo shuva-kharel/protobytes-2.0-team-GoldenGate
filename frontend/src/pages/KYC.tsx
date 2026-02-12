@@ -1,431 +1,304 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
-// @ts-ignore - ad-bs-converter doesn't have types
-import converter from 'ad-bs-converter';
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, CheckCircle } from "lucide-react";
+import { kycApi } from "../api/kycApi";
+import { useAuth } from "../context/AuthContext";
 
 const KYC: React.FC = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
-  const [adDate, setAdDate] = useState('');
-  const [bsDate, setBsDate] = useState('');
+  const { user } = useAuth();
 
-  // Handle AD date change
-  const handleAdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newAd = e.target.value;
-    setAdDate(newAd);
-    
-    if (newAd) {
-      try {
-        const [y, m, d] = newAd.split('-');
-        const bsResult = converter.ad2bs(`${y}/${m}/${d}`);
-        setBsDate(`${bsResult.en.year}-${String(bsResult.en.month).padStart(2, '0')}-${String(bsResult.en.day).padStart(2, '0')}`);
-      } catch (err) {
-        console.error('AD to BS conversion failed', err);
+  const [status, setStatus] = useState<
+    "none" | "pending" | "approved" | "rejected"
+  >("none");
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  const [fullName, setFullName] = useState("");
+  const [dob, setDob] = useState(""); // AD date input (YYYY-MM-DD)
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
+  const [category, setCategory] = useState("Individual");
+  const [governmentIdNumber, setGovernmentIdNumber] = useState("");
+
+  const [governmentIdImage, setGovernmentIdImage] = useState<File | null>(null);
+  const [selfieImage, setSelfieImage] = useState<File | null>(null);
+
+  const govRef = useRef<HTMLInputElement>(null);
+  const selfieRef = useRef<HTMLInputElement>(null);
+
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+
+  // Load current KYC
+  const loadKyc = async () => {
+    if (!user) return;
+    try {
+      const res = await kycApi.me();
+      const kyc = res.data?.kyc;
+      if (!kyc) {
+        setStatus("none");
+        return;
       }
+      setStatus(kyc.status);
+      setRejectionReason(kyc.rejectionReason || "");
+      // Prefill some fields for better UX
+      setFullName(kyc.fullName || user.fullName || user.username);
+      setDob(kyc.dob ? String(kyc.dob).slice(0, 10) : "");
+      setAddress(kyc.address || "");
+      setPhone(kyc.phone || "");
+      setCategory(kyc.category || "Individual");
+      setGovernmentIdNumber(kyc.governmentIdNumber || "");
+    } catch {
+      setStatus("none");
     }
   };
 
-  // Handle BS date change (simplified manual sync)
-  const handleBsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newBs = e.target.value;
-    setBsDate(newBs);
-    
-    // Attempt conversion only if format is YYYY-MM-DD
-    const bsRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (bsRegex.test(newBs)) {
-      try {
-        const [y, m, d] = newBs.split('-');
-        const adResult = converter.bs2ad(`${y}/${m}/${d}`);
-        setAdDate(`${adResult.year}-${String(adResult.month).padStart(2, '0')}-${String(adResult.day).padStart(2, '0')}`);
-      } catch (err) {
-        console.error('BS to AD conversion failed', err);
-      }
-    }
-  };
+  useEffect(() => {
+    loadKyc();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id]);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [ppPhoto, setPpPhoto] = useState<File | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const ppInputRef = React.useRef<HTMLInputElement>(null);
-
-  const handleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handlePpSelect = () => {
-    ppInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
-
-  const handlePpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setPpPhoto(e.target.files[0]);
-    }
-  };
-
-  const [isSubmitted, setIsSubmitted] = useState(false);
-
-  const handleNext = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (step < 3) {
-      setStep(step + 1);
-    } else {
-      setIsSubmitted(true);
-      // Optional: Navigate after a delay or let user click a button
-       setTimeout(() => {
-          navigate('/');
-       }, 5000); // Auto redirect after 5s or just let them read
-    }
-  };
-
-  if (isSubmitted) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-[#F0F2F5] flex flex-col items-center justify-center py-12 px-4 font-sans">
-        <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-10 text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-black text-slate-800 mb-4">KYC Sent for Verification</h2>
-          <p className="text-slate-600 leading-relaxed mb-8">
-            Our admin will review your submission and work accordingly. This usually takes <span className="font-bold">24-72 hours</span>.
+      <div className="min-h-[70vh] flex items-center justify-center px-4">
+        <div className="glass-card w-full max-w-lg rounded-2xl p-10 text-center">
+          <h2 className="text-2xl font-black mb-2">Login required</h2>
+          <p className="text-valentine-dark/60 mb-6">
+            Please login to submit KYC.
           </p>
           <button
-            onClick={() => navigate('/')}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+            onClick={() => navigate("/login")}
+            className="btn-primary px-8 py-3"
           >
-            Go to Home
+            Go to Login
           </button>
         </div>
       </div>
     );
   }
 
+  const canSubmit = status === "none" || status === "rejected";
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr("");
+    setMsg("");
+
+    if (!canSubmit) {
+      setErr(`KYC is already ${status}. You can't submit again right now.`);
+      return;
+    }
+
+    if (!fullName.trim()) return setErr("Full name is required.");
+    if (!dob) return setErr("Date of birth is required.");
+    if (!address.trim()) return setErr("Address is required.");
+    if (!phone.trim()) return setErr("Phone number is required.");
+    if (!governmentIdNumber.trim())
+      return setErr("Government ID number is required.");
+    if (!governmentIdImage) return setErr("Government ID image is required.");
+    if (!selfieImage) return setErr("Selfie image is required.");
+
+    try {
+      setLoading(true);
+
+      const fd = new FormData();
+      fd.append("fullName", fullName.trim());
+      fd.append("dob", dob); // backend will parse Date
+      fd.append("address", address.trim());
+      fd.append("country", "Nepal");
+      fd.append("phone", phone.trim());
+      fd.append("category", category);
+      fd.append("governmentIdNumber", governmentIdNumber.trim());
+
+      // ✅ exact keys backend expects
+      fd.append("governmentIdImage", governmentIdImage);
+      fd.append("selfieImage", selfieImage);
+
+      await kycApi.submit(fd);
+
+      setMsg("KYC submitted ✅ Pending admin review.");
+      setStatus("pending");
+      setTimeout(() => navigate("/profile"), 900);
+    } catch (error: any) {
+      setErr(error?.response?.data?.message || "KYC submission failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Status view if already pending/approved
+  if (!canSubmit) {
+    return (
+      <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-10 text-center">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-10 h-10 text-green-600" />
+          </div>
+
+          <h2 className="text-2xl font-black text-slate-800 mb-2">
+            KYC Status
+          </h2>
+          <p className="text-slate-600 mb-6">
+            Current status: <b>{status.toUpperCase()}</b>
+          </p>
+
+          {status === "rejected" && rejectionReason && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">
+              Rejection reason: {rejectionReason}
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate("/profile")}
+            className="mt-6 bg-blue-600 text-white px-8 py-3 rounded-lg font-bold"
+          >
+            Go to Profile
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Form
   return (
     <div className="min-h-screen bg-[#F0F2F5] flex flex-col items-center py-12 px-4 font-sans relative">
-      <button 
-        onClick={() => navigate('/')}
-        className="absolute top-6 left-6 md:top-8 md:left-8 flex items-center space-x-2 text-slate-600 hover:text-blue-600 font-bold transition-colors bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200"
+      <button
+        onClick={() => navigate("/profile")}
+        className="absolute top-6 left-6 flex items-center space-x-2 text-slate-600 hover:text-blue-600 font-bold bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200"
       >
         <ArrowLeft className="w-5 h-5" />
-        <span>Go to Home</span>
+        <span>Back</span>
       </button>
 
-      {/* Container */}
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12 relative overflow-hidden mt-12">
-        {/* Dark Mode Toggle (Visual Only) */}
-        <div className="absolute top-8 right-8">
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
-            <motion.div whileTap={{ scale: 0.9 }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-            </motion.div>
-          </div>
-        </div>
-
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12 mt-12">
         <div className="mb-8 text-center">
-            <h1 className="text-3xl font-black text-blue-600 mb-1 font-display tracking-tight">
-             Aincho <span className="ml-[2px]">Paincho</span>
-            </h1>
-            <h2 className="text-lg font-bold text-slate-700">KYC Verification</h2>
+          <h1 className="text-3xl font-black text-blue-600 mb-1">
+            Aincho Paincho
+          </h1>
+          <h2 className="text-lg font-bold text-slate-700">KYC Verification</h2>
         </div>
 
-
-
-        {/* Stepper */}
-        <div className="flex items-center justify-between mb-16 relative px-4">
-          <div className="absolute top-5 left-10 right-10 h-[2px] bg-slate-100 -z-0">
-             <motion.div 
-               initial={{ width: 0 }}
-               animate={{ width: `${(step - 1) * 50}%` }}
-               className="h-full bg-blue-600 transition-all duration-500"
-             />
+        {err && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-xl p-3">
+            {err}
           </div>
-          
-          {[
-            { id: 1, label: 'Personal Info' },
-            { id: 2, label: 'Documents' },
-            { id: 3, label: 'Verification' }
-          ].map((s) => (
-            <div key={s.id} className="relative z-10 flex flex-col items-center">
-              <div 
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
-                  s.id === step ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 
-                  s.id < step ? 'bg-blue-600 text-white' : 'bg-[#E5E7EB] text-slate-400'
-                }`}
+        )}
+        {msg && (
+          <div className="mb-6 bg-green-50 border border-green-200 text-green-700 rounded-xl p-3">
+            {msg}
+          </div>
+        )}
+
+        <form onSubmit={submit} className="space-y-6">
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Full name (as per document)"
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg"
+            required
+          />
+
+          <input
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg"
+            required
+          />
+
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Phone number"
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg"
+            required
+          />
+
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg"
+          >
+            <option>Individual</option>
+            <option>Business</option>
+            <option>Premium Account</option>
+            <option>Investor</option>
+            <option>Vendor</option>
+            <option>Freelancer</option>
+          </select>
+
+          <input
+            value={governmentIdNumber}
+            onChange={(e) => setGovernmentIdNumber(e.target.value)}
+            placeholder="Government ID number"
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg"
+            required
+          />
+
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Full address (province, district, municipality, ward, tole)"
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg"
+            rows={3}
+            required
+          />
+
+          {/* Files */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <p className="font-bold text-slate-700 mb-2">
+                Government ID Image *
+              </p>
+              <input
+                ref={govRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) =>
+                  setGovernmentIdImage(e.target.files?.[0] || null)
+                }
+              />
+              <button
+                type="button"
+                onClick={() => govRef.current?.click()}
+                className="w-full border border-slate-200 rounded-xl p-4 text-left"
               >
-                {s.id < step ? '✓' : s.id}
-              </div>
-              <span className={`text-[11px] font-bold mt-2 uppercase tracking-wider whitespace-nowrap ${
-                s.id <= step ? 'text-slate-700' : 'text-slate-400'
-              }`}>
-                {s.label}
-              </span>
+                {governmentIdImage
+                  ? `✅ ${governmentIdImage.name}`
+                  : "Upload Citizenship/Passport photo"}
+              </button>
             </div>
-          ))}
-        </div>
 
-        <form onSubmit={handleNext} className="space-y-10">
-          {step === 1 && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-10"
-            >
-              <div className="space-y-6">
-                <h3 className="text-2xl font-extrabold text-[#1E293B]">Personal Information</h3>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Full Name (as per document) <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    placeholder="E.g., Ram Bahadur Thapa"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Date of Birth (AD / ईस्वी) <span className="text-red-500">*</span></label>
-                    <input
-                      type="date"
-                      value={adDate}
-                      onChange={handleAdChange}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all shadow-sm"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Date of Birth (BS / वि.सं.) <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={bsDate}
-                      onChange={handleBsChange}
-                      placeholder="E.g., 2055-05-15"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 p-4 rounded-lg flex items-start space-x-3 border border-slate-100">
-                  <span className="text-slate-600 text-xs leading-relaxed">
-                    <span className="font-bold">Note:</span> Enter BS date in YYYY-MM-DD format (e.g., 2055-05-15 for Shrawan 15, 2055)
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Gender <span className="text-red-500">*</span></label>
-                  <select
-                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white transition-all appearance-none cursor-pointer shadow-sm"
-                    required
-                  >
-                    <option value="">Select...</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <h3 className="text-2xl font-extrabold text-[#1E293B]">Current Address</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Province <span className="text-red-500">*</span></label>
-                    <select
-                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white transition-all shadow-sm"
-                      required
-                    >
-                      <option value="">Select...</option>
-                      <option value="1">Province No. 1</option>
-                      <option value="2">Madhesh Province</option>
-                      <option value="3">Bagmati Province</option>
-                      <option value="4">Gandaki Province</option>
-                      <option value="5">Lumbini Province</option>
-                      <option value="6">Karnali Province</option>
-                      <option value="7">Sudurpashchim Province</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">District <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="E.g., Kathmandu"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Municipality <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="E.g., Kathmandu Metropolitan"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Ward No. <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="E.g., 10"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tole/Street</label>
-                  <input
-                    type="text"
-                    placeholder="E.g., Putalisadak"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm"
-                  />
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-10"
-            >
-              <div className="space-y-6">
-                <h3 className="text-2xl font-extrabold text-[#1E293B]">Document Verification</h3>
-                
-                {/* PP Size Photo Upload */}
-                <div className="space-y-3">
-                  <label className="text-sm font-bold text-slate-700">Passport Size Photo <span className="text-red-500">*</span></label>
-                  <input 
-                    type="file" 
-                    ref={ppInputRef} 
-                    onChange={handlePpChange} 
-                    className="hidden" 
-                    accept="image/*"
-                  />
-                  <div 
-                    onClick={handlePpSelect}
-                    className={`p-6 border-2 border-dashed rounded-xl text-center transition-all cursor-pointer group flex flex-col items-center justify-center ${
-                      ppPhoto 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-slate-200 bg-slate-50 hover:border-blue-400'
-                    }`}
-                  >
-                    {ppPhoto ? (
-                      <div className="relative w-24 h-24 mb-2">
-                        <img 
-                          src={URL.createObjectURL(ppPhoto)} 
-                          alt="PP Preview" 
-                          className="w-full h-full object-cover rounded-lg shadow-sm border border-blue-200"
-                        />
-                        <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-1 rounded-full">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                      </div>
-                    )}
-                    <div>
-                      {ppPhoto ? (
-                        <div>
-                          <p className="font-bold text-blue-700 text-sm">{ppPhoto.name}</p>
-                          <p className="text-blue-500 text-xs mt-1">Click to change</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="font-bold text-slate-700 text-sm">Upload Photo</p>
-                          <p className="text-slate-400 text-[10px] mt-1">Recent PP size photo</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Citizenship Upload */}
-                <div className="space-y-3">
-                  <label className="text-sm font-bold text-slate-700">Citizenship / Passport <span className="text-red-500">*</span></label>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    className="hidden" 
-                    accept="image/*"
-                  />
-                
-                <div 
-                  onClick={handleFileSelect}
-                  className={`p-12 border-2 border-dashed rounded-2xl text-center transition-all cursor-pointer group ${
-                    selectedFile 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-slate-200 bg-slate-50 hover:border-blue-400'
-                  }`}
-                >
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
-                    {selectedFile ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                    )}
-                  </div>
-                  <div>
-                    {selectedFile ? (
-                      <div>
-                        <p className="font-bold text-blue-700">{selectedFile.name}</p>
-                        <p className="text-blue-500 text-xs mt-1">Click to change</p>
-                      </div>
-                    ) : (
-                      <p className="font-bold text-slate-700">Upload Citizenship / Passport</p>
-                    )}
-                  </div>
-                  <p className="text-red-500 font-medium text-xs mt-4 bg-red-50 inline-block px-3 py-1 rounded-full border border-red-100">
-                    For citizenship upload, make sure both sides are visible in the same photo
-                  </p>
-                  {!selectedFile && <p className="text-slate-400 text-xs mt-2">Maximum file size: 5MB</p>}
-                </div>
-              </div>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-10 text-center py-12"
-            >
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <h3 className="text-3xl font-black text-slate-800">All Set!</h3>
-              <p className="text-slate-500 max-w-sm mx-auto">Your details have been recorded. Press complete to start sharing and renting.</p>
-            </motion.div>
-          )}
-
-          <div className="flex items-center justify-end pt-8 border-t border-slate-100">
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-700 transition-all flex items-center space-x-2 shadow-lg shadow-blue-600/20 active:translate-y-0.5"
-            >
-              <span>{step === 3 ? 'Complete' : 'Next'}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
+            <div>
+              <p className="font-bold text-slate-700 mb-2">Selfie Image *</p>
+              <input
+                ref={selfieRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={(e) => setSelfieImage(e.target.files?.[0] || null)}
+              />
+              <button
+                type="button"
+                onClick={() => selfieRef.current?.click()}
+                className="w-full border border-slate-200 rounded-xl p-4 text-left"
+              >
+                {selfieImage ? `✅ ${selfieImage.name}` : "Upload selfie photo"}
+              </button>
+            </div>
           </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold w-full disabled:opacity-60"
+          >
+            {loading ? "Submitting..." : "Submit KYC ✅"}
+          </button>
         </form>
       </div>
     </div>

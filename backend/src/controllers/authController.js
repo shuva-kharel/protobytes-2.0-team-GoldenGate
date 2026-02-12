@@ -23,25 +23,22 @@ function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+// ✅ allow cookie for both /2fa/verify and /2fa/resend
 function set2FACookie(res, userId) {
-  const token = jwt.sign(
-    { id: userId, purpose: "2fa" },
-    process.env.JWT_SECRET,
-    { expiresIn: "10m" }
-  );
+  const token = jwt.sign({ id: userId, purpose: "2fa" }, process.env.JWT_SECRET, { expiresIn: "10m" });
 
   res.cookie("2fa_token", token, {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === "true",
     sameSite: "lax",
     maxAge: 1000 * 60 * 10,
-    path: "/api/auth/2fa/verify",
+    path: "/api/auth/2fa", // ✅ CHANGED (was /api/auth/2fa/verify)
     domain: process.env.COOKIE_DOMAIN || undefined,
   });
 }
 
 function clear2FACookie(res) {
-  res.clearCookie("2fa_token", { path: "/api/auth/2fa/verify" });
+  res.clearCookie("2fa_token", { path: "/api/auth/2fa" }); // ✅ CHANGED
 }
 
 // ─────────────────────────────────────────────
@@ -203,6 +200,7 @@ const loginUser = async (req, res, next) => {
     set2FACookie(res, user._id.toString());
 
     res.json({
+      jwt,
       message: "2FA code sent to your email. Verify to complete login.",
       requires2FA: true,
     });
@@ -248,7 +246,7 @@ const verify2FA = async (req, res, next) => {
     // Create session (device recognition via req.deviceId)
     const session = await Session.create({
       user: user._id,
-      deviceId: req.deviceId,
+      deviceId: req.deviceId || "unknown-device",
       ip: req.ip,
       userAgent: req.headers["user-agent"] || "",
       refreshTokenHash: "temp",
