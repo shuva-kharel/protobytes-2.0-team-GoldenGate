@@ -4,18 +4,17 @@ const cloudinary = require("../config/cloudinary");
 const { uploadBufferToCloudinary } = require("../utils/cloudinaryUpload");
 const logger = require("../utils/logger");
 
-// POST /api/user/update-profile  (multipart/form-data)
-// fields: username, fullName, bio
-// file: profilePicture
+// POST /api/user/update-profile
 const updateProfile = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const { username, fullName, bio } = req.body;
 
-    // Unique username check
+    // Check for unique username
     if (username) {
       const existing = await User.findOne({ username, _id: { $ne: userId } });
-      if (existing) return res.status(400).json({ message: "Username already taken" });
+      if (existing)
+        return res.status(400).json({ message: "Username already taken" });
     }
 
     const user = await User.findById(userId);
@@ -23,7 +22,7 @@ const updateProfile = async (req, res, next) => {
 
     // Upload profile picture if provided
     if (req.file) {
-      // delete old pic
+      // Delete old pic if exists
       if (user.profilePicture?.publicId) {
         await cloudinary.uploader.destroy(user.profilePicture.publicId, {
           resource_type: "image",
@@ -37,7 +36,7 @@ const updateProfile = async (req, res, next) => {
       });
 
       user.profilePicture = {
-        url: upload.secure_url,
+        url: upload.secure_url,   // Store URL for frontend
         publicId: upload.public_id,
       };
     }
@@ -47,9 +46,9 @@ const updateProfile = async (req, res, next) => {
     if (bio !== undefined) user.bio = bio;
 
     await user.save();
-
     logger.info("Profile updated", { userId });
 
+    // Send normalized user data
     res.json({
       message: "Profile updated successfully",
       user: {
@@ -58,7 +57,7 @@ const updateProfile = async (req, res, next) => {
         email: user.email,
         fullName: user.fullName || "",
         bio: user.bio || "",
-        profilePicture: user.profilePicture?.url || "",
+        profilePicture: user.profilePicture?.url || "", // always URL
       },
     });
   } catch (err) {

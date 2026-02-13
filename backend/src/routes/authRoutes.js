@@ -15,6 +15,8 @@ const {
   logoutUser,
   getProfile,
   updatePassword,           // <-- ADD
+  listSessions,
+  revokeSession
 
 } = require("../controllers/authController");
 
@@ -61,5 +63,10 @@ router.get(
     res.json({ message: `Welcome admin ${req.user.username}` });
   }
 );
+
+
+router.get("/sessions", asyncHandler(protect), asyncHandler(listSessions));
+router.post("/sessions/revoke/:sessionId", asyncHandler(protect), asyncHandler(revokeSession));
+
 
 module.exports = router;
