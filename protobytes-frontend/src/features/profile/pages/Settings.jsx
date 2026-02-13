@@ -1,26 +1,31 @@
 // src/features/profile/pages/Settings.jsx
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/authStore";
 import { axiosClient } from "../../../api/axiosClient";
 
 /**
- * Extracts a safe URL regardless of shape:
- * - string url OR
- * - { url, publicId }
+ * Helper to get a safe avatar URL
+ * - 1️⃣ Preview (local)
+ * - 2️⃣ Uploaded profile picture (string or {url})
+ * - 3️⃣ UI Avatar from username
+ * - 4️⃣ Local default fallback
  */
-function getProfilePictureUrl(user) {
-  if (!user) return "";
-  const pic = user.profilePicture;
-  if (!pic) return "";
-  return typeof pic === "string" ? pic : pic?.url || "";
+function getSafeAvatarUrl(user, previewUrl = "") {
+  if (previewUrl) return previewUrl;
+  if (user?.profilePicture) {
+    return typeof user.profilePicture === "string"
+      ? user.profilePicture
+      : user.profilePicture.url;
+  }
+  if (user?.username) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      user.username,
+    )}&background=E0E0E0&color=555555&size=128`;
+  }
+  return "/images/default-avatar.png"; // ensure this file exists in your public/images
 }
 
-/**
- * Small Avatar component:
- * - Shows user image if present
- * - Else renders initials or default SVG
- * - Accepts size via className
- */
 function Avatar({ src, name = "", className = "" }) {
   const initials = useMemo(() => {
     const n = (name || "").trim();
@@ -57,34 +62,65 @@ function Avatar({ src, name = "", className = "" }) {
     );
   }
 
-  return;
-  <img
-    src={src}
-    alt={name ? `${name}'s avatar` : "Avatar"}
-    className={`rounded-full object-cover border ${className}`}
-    onError={(e) => {
-      // graceful fallback to empty to trigger default avatar
-      e.currentTarget.src = "";
-    }}
-  />;
+  return (
+    <img
+      src={src}
+      alt={name ? `${name}'s avatar` : "Avatar"}
+      className={`rounded-full object-cover border ${className}`}
+      onError={(e) => {
+        e.currentTarget.src = "/images/default-avatar.png";
+      }}
+    />
+  );
+}
+
+function KycBadge({ status }) {
+  if (!status) return null;
+  const map = {
+    approved: "bg-green-100 text-green-700 border-green-200",
+    pending: "bg-amber-100 text-amber-800 border-amber-200",
+    rejected: "bg-red-100 text-red-700 border-red-200",
+  };
+  const label =
+    status === "approved"
+      ? "KYC Verified"
+      : status === "pending"
+        ? "KYC Pending"
+        : "KYC Rejected";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${map[status] || "bg-gray-100 text-gray-700 border-gray-200"}`}
+    >
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-80" />
+      {label}
+    </span>
+  );
 }
 
 export default function Settings() {
   const { user, setUser } = useAuth();
 
+  // Sessions
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
+  // Profile form state
   const [savingProfile, setSavingProfile] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
-
   const [form, setForm] = useState({
     username: "",
     fullName: "",
     bio: "",
-    profilePicture: null, // File
-    previewUrl: "", // local preview URL (ObjectURL)
+    profilePicture: null,
+    previewUrl: "",
   });
+
+  // Password
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // KYC state
+  const [kyc, setKyc] = useState(null);
+  const [kycLoading, setKycLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -94,12 +130,25 @@ export default function Settings() {
         fullName: user.fullName || "",
         bio: user.bio || "",
         profilePicture: null,
-        previewUrl: "", // reset preview when user changes/hydrates
+        previewUrl: "",
       }));
+      fetchKyc();
     }
     loadSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const fetchKyc = async () => {
+    setKycLoading(true);
+    try {
+      const res = await axiosClient.get("/kyc/me");
+      setKyc(res.data?.kyc || null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setKycLoading(false);
+    }
+  };
 
   const loadSessions = async () => {
     setLoadingSessions(true);
@@ -116,7 +165,6 @@ export default function Settings() {
   const updateProfile = async (e) => {
     e.preventDefault();
     setSavingProfile(true);
-
     try {
       const formData = new FormData();
       formData.append("username", form.username.trim());
@@ -130,21 +178,12 @@ export default function Settings() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      // Update auth user with normalized backend response (string URL)
       setUser(res.data.user);
-
-      // Cleanup preview URL if any
-      if (form.previewUrl) {
-        URL.revokeObjectURL(form.previewUrl);
-      }
-
       setForm((prev) => ({ ...prev, profilePicture: null, previewUrl: "" }));
       alert("Profile updated");
     } catch (err) {
       console.error(err);
-      const message =
-        err?.response?.data?.message ||
-        "Profile update failed. Please try again.";
+      const message = err?.response?.data?.message || "Profile update failed";
       alert(message);
     } finally {
       setSavingProfile(false);
@@ -154,7 +193,6 @@ export default function Settings() {
   const updatePassword = async (e) => {
     e.preventDefault();
     setChangingPassword(true);
-
     const currentPassword = e.target.currentPassword.value;
     const newPassword = e.target.newPassword.value;
 
@@ -174,9 +212,7 @@ export default function Settings() {
   };
 
   const revokeSession = async (id) => {
-    const ok = confirm("Revoke this session? It will be signed out.");
-    if (!ok) return;
-
+    if (!confirm("Revoke this session? It will be signed out.")) return;
     try {
       await axiosClient.post(`/auth/sessions/revoke/${id}`);
       await loadSessions();
@@ -187,36 +223,26 @@ export default function Settings() {
   };
 
   const onPickFile = (file) => {
-    // Clear current preview first (avoid memory leak)
-    if (form.previewUrl) {
-      URL.revokeObjectURL(form.previewUrl);
-    }
+    if (!file)
+      return setForm((prev) => ({
+        ...prev,
+        profilePicture: null,
+        previewUrl: "",
+      }));
 
-    if (!file) {
-      setForm((prev) => ({ ...prev, profilePicture: null, previewUrl: "" }));
-      return;
-    }
-    // basic client-side checks (optional)
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
-      setForm((prev) => ({ ...prev, profilePicture: null, previewUrl: "" }));
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Max file size is 5 MB");
-      setForm((prev) => ({ ...prev, profilePicture: null, previewUrl: "" }));
-      return;
-    }
+    if (!file.type.startsWith("image/"))
+      return alert("Please select an image file");
+    if (file.size > 5 * 1024 * 1024) return alert("Max file size is 5 MB");
 
     const previewUrl = URL.createObjectURL(file);
     setForm((prev) => ({ ...prev, profilePicture: file, previewUrl }));
   };
 
-  // Compute effective avatar (local preview > server value)
-  const effectiveAvatarUrl =
-    form.previewUrl || getProfilePictureUrl(user) || "";
-
   if (!user) return null;
+
+  // Derive KYC status
+  const kycStatus = user?.kycStatus || kyc?.status || null;
+  const effectiveAvatarUrl = getSafeAvatarUrl(user, form.previewUrl);
 
   return (
     <div className="max-w-4xl mx-auto py-10 space-y-10">
@@ -224,25 +250,58 @@ export default function Settings() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Account Settings
         </h1>
+        {/* Global badge at top */}
+        <KycBadge status={kycStatus} />
       </header>
 
       {/* PROFILE */}
       <section className="rounded-xl border bg-white/70 backdrop-blur p-6 shadow-sm">
         <form onSubmit={updateProfile} className="space-y-6">
-          <div>
-            <h2 className="font-semibold text-xl">Profile</h2>
-            <p className="text-sm text-gray-500">
-              Update your public information and profile photo.
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-xl">Profile</h2>
+              <p className="text-sm text-gray-500">
+                Update your public information and profile photo.
+              </p>
+            </div>
+
+            {/* Show KYC action on the right */}
+            <div className="flex items-center gap-3">
+              <KycBadge status={kycStatus} />
+              {kycStatus !== "approved" && (
+                <Link
+                  to="/kyc"
+                  className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm shadow-sm hover:bg-gray-50"
+                >
+                  <svg
+                    className="w-4 h-4 text-rose-600"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z" />
+                  </svg>
+                  {kyc ? "Update KYC" : "Submit KYC"}
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* Avatar */}
           <div className="flex items-center gap-5">
-            <Avatar
-              src={effectiveAvatarUrl}
-              name={user.fullName || user.username}
-              className="w-20 h-20"
-            />
+            <div className="relative">
+              <Avatar
+                src={effectiveAvatarUrl}
+                name={user.fullName || user.username}
+                className="w-20 h-20"
+              />
+              {/* Small corner badge */}
+              {kycStatus === "approved" && (
+                <span
+                  className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-green-500 border-2 border-white"
+                  title="KYC Verified"
+                />
+              )}
+            </div>
 
             <div className="space-y-2">
               <label
@@ -253,7 +312,6 @@ export default function Settings() {
                   className="w-4 h-4 text-gray-600"
                   viewBox="0 0 24 24"
                   fill="currentColor"
-                  aria-hidden="true"
                 >
                   <path d="M9 2l1.586 1.586L9 5.172 7.414 3.586 9 2zm-6 8l1.586 1.586L3 13.172 1.414 11.586 3 10zM21 12l-1.586 1.586L18 12.172l1.414-1.586L21 12zm-9 10l-1.586-1.586L12 18.828l1.586 1.586L12 22z" />
                 </svg>
@@ -292,7 +350,6 @@ export default function Settings() {
                 autoComplete="username"
               />
             </div>
-
             <div className="space-y-1">
               <label htmlFor="fullName" className="text-sm font-medium">
                 Full name
@@ -338,14 +395,13 @@ export default function Settings() {
               <button
                 type="button"
                 className="text-sm text-gray-600 hover:text-gray-900"
-                onClick={() => {
-                  if (form.previewUrl) URL.revokeObjectURL(form.previewUrl);
+                onClick={() =>
                   setForm((prev) => ({
                     ...prev,
                     profilePicture: null,
                     previewUrl: "",
-                  }));
-                }}
+                  }))
+                }
               >
                 Cancel new photo
               </button>

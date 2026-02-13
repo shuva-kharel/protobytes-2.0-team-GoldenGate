@@ -1,11 +1,20 @@
-import { Navigate, Outlet } from "react-router-dom";
-import Loading from "./Loading";
+// src/components/common/ProtectedRoute.jsx
 import { useAuth } from "../../features/auth/authStore";
+import { Navigate } from "react-router-dom";
 
-export default function ProtectedRoute() {
+export default function ProtectedRoute({ children, roles = [] }) {
   const { user, booting } = useAuth();
 
-  if (booting) return <Loading label="Loading your session..." />;
+  // Still loading current session? Wait
+  if (booting) return <div>Loading…</div>;
 
-  return user ? <Outlet /> : <Navigate to="/login" replace />;
+  // Not logged in
+  if (!user) return <Navigate to="/auth/login" replace />;
+
+  // Role check (if roles array is provided)
+  if (roles.length > 0 && !roles.includes(user.role)) {
+    return <Navigate to="/" replace />; // or an "Access Denied" page
+  }
+
+  return children;
 }

@@ -6,6 +6,7 @@ const { protect } = require("../middlewares/authMiddleware");
 const { requireVerifiedUser } = require("../middlewares/verifiedUserMiddleware");
 
 const {
+  requestBorrow,          // only once here
   listMyRequests,
   listRequestsForOwner,
   approveBorrowRequest,
@@ -13,6 +14,7 @@ const {
   cancelBorrowRequest,
   completeBorrow,
 } = require("../controllers/borrowController");
+
 
 router.get("/mine", asyncHandler(protect), asyncHandler(requireVerifiedUser), asyncHandler(listMyRequests));
 router.get("/owner", asyncHandler(protect), asyncHandler(requireVerifiedUser), asyncHandler(listRequestsForOwner));
@@ -22,5 +24,6 @@ router.patch("/:requestId/reject", asyncHandler(protect), asyncHandler(requireVe
 
 router.patch("/:requestId/cancel", asyncHandler(protect), asyncHandler(requireVerifiedUser), asyncHandler(cancelBorrowRequest));
 router.patch("/:requestId/complete", asyncHandler(protect), asyncHandler(requireVerifiedUser), asyncHandler(completeBorrow));
+router.post("/:id", asyncHandler(protect), asyncHandler(requireVerifiedUser), asyncHandler(requestBorrow));
 
 module.exports = router;

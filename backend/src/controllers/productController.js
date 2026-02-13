@@ -162,10 +162,23 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
+const getMyProducts = async (req, res, next) => {
+  try {
+    const products = await Product.find({
+      "uploadedBy.user": req.user._id,
+    }).sort({ createdAt: -1 });
+
+    res.json({ items: products, total: products.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getProducts,
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
+  getMyProducts
 };
