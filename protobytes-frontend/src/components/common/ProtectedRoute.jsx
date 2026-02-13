@@ -13,7 +13,7 @@ export default function ProtectedRoute({ children, roles = [] }) {
 
   // Role check (if roles array is provided)
   if (roles.length > 0 && !roles.includes(user.role)) {
-    return <Navigate to="/" replace />; // or an "Access Denied" page
+    return <Navigate to="/home" replace />; // or an "Access Denied" page
   }
 
   return children;

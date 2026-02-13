@@ -36,6 +36,9 @@ export default function ProductCreation() {
   const [submitting, setSubmitting] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [countdown, setCountdown] = useState(3);
+  const [successMessage, setSuccessMessage] = useState(
+    "Your product submission was received.",
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -57,9 +60,12 @@ export default function ProductCreation() {
   const handleCreate = async (data) => {
     try {
       setSubmitting(true);
-      await axiosClient.post("/products", data, {
+      const res = await axiosClient.post("/products", data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      setSuccessMessage(
+        res.data?.message || "Your product submission was received.",
+      );
       setSuccessOpen(true);
     } catch (err) {
       console.error(err);
@@ -109,9 +115,7 @@ export default function ProductCreation() {
           </>
         }
       >
-        <p>
-          Your product is now live (or pending review if you use moderation).
-        </p>
+        <p>{successMessage}</p>
         <p className="text-gray-600">
           Redirecting to <strong>My Products</strong> in{" "}
           <strong>{countdown}</strong>…
@@ -120,4 +124,3 @@ export default function ProductCreation() {
     </div>
   );
 }
-``;

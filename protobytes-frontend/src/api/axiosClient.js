@@ -8,6 +8,8 @@ export const axiosClient = axios.create({
 });
 
 let accessToken = null;
+let isRefreshing = false;
+let refreshPromise = null;
 
 // 🔹 Set access token in memory (call this after login/2FA/refresh)
 export const setAccessToken = (token) => {
@@ -27,6 +29,7 @@ axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    if (!originalRequest) return Promise.reject(error);
 
     // prevent infinite loop
     if (
@@ -34,22 +37,31 @@ axiosClient.interceptors.response.use(
       !originalRequest._retry &&
       !originalRequest.url.includes("/auth/refresh")
     ) {
-      // originalRequest._retry = true;
+      originalRequest._retry = true;
 
       try {
-        const res = await axiosClient.post("/auth/refresh");
+        if (!isRefreshing) {
+          isRefreshing = true;
+          refreshPromise = axiosClient.post("/auth/refresh");
+        }
 
-        const newAccessToken = res.data.token;
-
-        // store new token in memory
-        accessToken = newAccessToken;
+        const res = await refreshPromise;
+        const newAccessToken = res.data?.accessToken || res.data?.token || null;
+        setAccessToken(newAccessToken);
 
         // retry original request
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        originalRequest.headers = originalRequest.headers || {};
+        if (newAccessToken) {
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        } else {
+          delete originalRequest.headers.Authorization;
+        }
         return axiosClient(originalRequest);
-      } catch (refreshError) {
-        // refresh failed → force logout
-        // window.location.href = "/login";
+      } catch {
+        setAccessToken(null);
+      } finally {
+        isRefreshing = false;
+        refreshPromise = null;
       }
     }
 

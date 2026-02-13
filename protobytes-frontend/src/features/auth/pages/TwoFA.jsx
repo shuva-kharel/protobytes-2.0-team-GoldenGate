@@ -17,6 +17,7 @@ export default function TwoFA() {
   const [resending, setResending] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const method = sessionStorage.getItem("login_2fa_method") || "email";
 
   const submit = async (e) => {
     e.preventDefault();
@@ -37,7 +38,8 @@ export default function TwoFA() {
       setAccessToken(res.data.token);
 
       await loadMe();
-      navigate("/");
+      sessionStorage.removeItem("login_2fa_method");
+      navigate("/home");
     } catch (err) {
       setError(err?.response?.data?.message || "2FA verification failed.");
     } finally {
@@ -67,7 +69,9 @@ export default function TwoFA() {
             🔐 2FA Verification
           </h1>
           <p className="mt-2 text-rose-600">
-            Enter the OTP sent to your email.
+            {method === "authenticator"
+              ? "Enter the 6-digit code from Google Authenticator."
+              : "Enter the OTP sent to your email."}
           </p>
         </div>
 
@@ -100,13 +104,17 @@ export default function TwoFA() {
           </form>
 
           <div className="mt-4 flex items-center justify-between text-sm">
-            <button
-              onClick={resend}
-              disabled={resending}
-              className="text-rose-700 underline hover:text-rose-900 disabled:opacity-60"
-            >
-              {resending ? "Resending…" : "Resend OTP"}
-            </button>
+            {method === "email" ? (
+              <button
+                onClick={resend}
+                disabled={resending}
+                className="text-rose-700 underline hover:text-rose-900 disabled:opacity-60"
+              >
+                {resending ? "Resending…" : "Resend OTP"}
+              </button>
+            ) : (
+              <span className="text-slate-500">Authenticator app enabled</span>
+            )}
 
             <Link
               to="/login"

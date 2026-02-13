@@ -45,4 +45,53 @@ body {
     "Noto Sans",
     "Apple Color Emoji",
     "Segoe UI Emoji";
+  color: #0f172a;
+  background: radial-gradient(circle at top left, #ffe4e6 0%, #fff 28%, #fff 72%, #ffe4e6 100%);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  transition: color 0.2s ease;
+}
+
+::selection {
+  background: #fecdd3;
+  color: #881337;
+}
+
+.love-particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.love-particle {
+  position: absolute;
+  top: -12%;
+  color: #fb7185;
+  text-shadow: 0 0 8px rgba(251, 113, 133, 0.35);
+  animation-name: love-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes love-fall {
+  0% {
+    transform: translate3d(0, -6vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate3d(15px, 112vh, 0) rotate(360deg);
+    opacity: 0;
+  }
 }

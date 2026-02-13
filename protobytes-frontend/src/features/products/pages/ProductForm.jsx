@@ -31,6 +31,7 @@ export default function ProductForm({
     borrowPrice: "",
     location: "",
     productAge: "",
+    condition: "",
     description: "",
     productImage: null,
     status: "available", // only used in edit mode
@@ -43,6 +44,7 @@ export default function ProductForm({
   // Hydrate on edit
   useEffect(() => {
     if (mode === "edit" && initialData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         name: initialData.name || "",
         category: initialData.category || "",
@@ -50,6 +52,7 @@ export default function ProductForm({
         borrowPrice: initialData.borrowPrice ?? "",
         location: initialData.location || "",
         productAge: initialData.productAge || "",
+        condition: initialData.condition || "",
         description: initialData.description || "",
         productImage: null, // selecting new file will replace
         status: initialData.status || "available",
@@ -65,6 +68,7 @@ export default function ProductForm({
   // Preview management
   useEffect(() => {
     if (!form.productImage) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPreview("");
       return;
     }
@@ -115,6 +119,7 @@ export default function ProductForm({
       borrowPrice: form.borrowPrice,
       location: form.location,
       productAge: form.productAge,
+      condition: form.condition,
       description: form.description.trim(),
     };
 
@@ -137,6 +142,32 @@ export default function ProductForm({
 
   const charCount = form.description?.length || 0;
   const maxChars = 600;
+
+  const estimatedBorrowPrice = useMemo(() => {
+    const salePrice = Number(form.price || 0);
+    if (!salePrice) return 0;
+
+    const ageRaw = String(form.productAge || "").toLowerCase();
+    const ageNum = Number(ageRaw.match(/\d+(\.\d+)?/)?.[0] || 0);
+    const unitMultiplier = ageRaw.includes("year") ? 12 : ageRaw.includes("month") ? 1 : 0;
+    const ageMonths = ageNum * unitMultiplier;
+
+    const ageFactor = Math.max(0.45, 1 - ageMonths * 0.03);
+    const conditionFactor =
+      form.condition === "new"
+        ? 1.05
+        : form.condition === "like_new"
+          ? 1
+          : form.condition === "good"
+            ? 0.9
+            : form.condition === "fair"
+              ? 0.75
+              : form.condition === "poor"
+                ? 0.6
+                : 0.85;
+
+    return Math.max(50, Math.round(salePrice * 0.03 * ageFactor * conditionFactor));
+  }, [form.price, form.productAge, form.condition]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -164,7 +195,8 @@ export default function ProductForm({
                   disabled={disabled}
                 >
                   <option value="available">Available</option>
-                  <option value="unavailable">Unavailable</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="pending_approval">Pending Approval</option>
                 </select>
               </div>
             )}
@@ -343,7 +375,7 @@ export default function ProductForm({
           </div>
 
           {/* Location & Age */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-800">
                 Location <span className="text-rose-600">*</span>
@@ -380,7 +412,7 @@ export default function ProductForm({
               )}
             </div>
 
-            <div>
+            <div className="md:col-span-1">
               <label className="block text-sm font-medium text-gray-800">
                 Product Age <span className="text-gray-400">(optional)</span>
               </label>
@@ -396,8 +428,8 @@ export default function ProductForm({
                   disabled={disabled}
                 />
                 {/* Quick presets */}
-                <div className="flex items-center gap-2">
-                  {[].map((v) => (
+                <div className="flex flex-wrap items-center gap-1">
+                  {["3 months", "6 months", "1 year"].map((v) => (
                     <button
                       key={v}
                       type="button"
@@ -412,6 +444,30 @@ export default function ProductForm({
                   ))}
                 </div>
               </div>
+            </div>
+
+            <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-gray-800">
+                Condition <span className="text-gray-400">(optional)</span>
+              </label>
+              <select
+                value={form.condition}
+                onChange={(e) => setForm({ ...form, condition: e.target.value })}
+                className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                disabled={disabled}
+              >
+                <option value="">Select condition</option>
+                <option value="new">New</option>
+                <option value="like_new">Like new</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+              </select>
+              {estimatedBorrowPrice > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Suggested borrow/day: Rs {estimatedBorrowPrice.toLocaleString()}
+                </p>
+              )}
             </div>
           </div>
 

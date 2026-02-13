@@ -2,12 +2,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authApi } from "../../../api/authApi";
+import { setAccessToken } from "../../../api/axiosClient";
+import { useAuth } from "../authStore";
 import Card from "../../../components/ui/Card";
 import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { loadMe } = useAuth();
 
   const [form, setForm] = useState({ login: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -28,13 +31,21 @@ export default function Login() {
 
     try {
       setLoading(true);
-      await authApi.login({
+      const res = await authApi.login({
         login: form.login.trim(),
         password: form.password,
       });
 
-      // login step 1 success -> 2fa_token cookie set
-      navigate("/2fa");
+      if (res.data?.requires2FA) {
+        sessionStorage.setItem("login_2fa_method", res.data?.method || "email");
+        navigate("/2fa");
+        return;
+      }
+
+      const token = res.data?.token || res.data?.accessToken || null;
+      setAccessToken(token);
+      await loadMe();
+      navigate("/home");
     } catch (err) {
       setError(err?.response?.data?.message || "Login failed.");
     } finally {

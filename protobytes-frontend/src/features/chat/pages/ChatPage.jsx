@@ -77,9 +77,15 @@ export default function ChatPage() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isRealtimeReady, setIsRealtimeReady] = useState(false);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const activeConversationIdRef = useRef("");
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   const loadConversations = useCallback(async () => {
     const res = await chatApi.listConversations();
@@ -168,6 +174,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user?._id) return;
     let cancelled = false;
+    setIsRealtimeReady(false);
 
     (async () => {
       try {
@@ -180,12 +187,15 @@ export default function ChatPage() {
         });
 
         socketRef.current = socket;
+        socket.on("connect", () => setIsRealtimeReady(true));
+        socket.on("disconnect", () => setIsRealtimeReady(false));
+        socket.on("connect_error", () => setIsRealtimeReady(false));
 
         socket.on("chat:message:new", (msg) => {
           if (!msg?.conversation) return;
 
           const conversationId = String(msg.conversation);
-          if (conversationId === String(activeConversationId)) {
+          if (conversationId === String(activeConversationIdRef.current)) {
             setMessages((prev) => {
               if (prev.some((m) => String(m._id) === String(msg._id))) return prev;
               return [...prev, msg];
@@ -198,15 +208,17 @@ export default function ChatPage() {
         });
       } catch {
         // socket.io-client not installed yet; chat still works via REST fallback.
+        setIsRealtimeReady(false);
       }
     })();
 
     return () => {
       cancelled = true;
+      setIsRealtimeReady(false);
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [activeConversationId, loadConversations, user?._id]);
+  }, [loadConversations, user?._id]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -218,6 +230,25 @@ export default function ChatPage() {
       socket.emit("chat:leave", { conversationId: activeConversationId });
     };
   }, [activeConversationId]);
+
+  useEffect(() => {
+    if (isRealtimeReady) return;
+    if (!activeConversationId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const [messageRes] = await Promise.all([
+          chatApi.getMessages(activeConversationId, { limit: 60 }),
+          loadConversations(),
+        ]);
+        setMessages(messageRes.data?.items || []);
+      } catch {
+        // keep silent; user already sees persistent errors from explicit actions
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [activeConversationId, isRealtimeReady, loadConversations]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -318,8 +349,22 @@ export default function ChatPage() {
         <div className="flex flex-col min-h-0">
           <header className="px-4 py-3 border-b border-rose-100 flex items-center justify-between">
             <div>
-              <p className="font-semibold">{activeConversation?.otherUser?.fullName || activeConversation?.otherUser?.username || "Select a chat"}</p>
-              <p className="text-xs text-gray-600">Realtime chat enabled</p>
+              <p className="font-semibold">
+                {activeConversation?.otherUser?._id ? (
+                  <Link
+                    to={`/user/${activeConversation.otherUser._id}`}
+                    className="hover:text-rose-700"
+                  >
+                    {activeConversation?.otherUser?.fullName ||
+                      activeConversation?.otherUser?.username}
+                  </Link>
+                ) : (
+                  "Select a chat"
+                )}
+              </p>
+              <p className="text-xs text-gray-600">
+                {isRealtimeReady ? "Realtime chat enabled" : "Syncing every few seconds"}
+              </p>
             </div>
           </header>
 

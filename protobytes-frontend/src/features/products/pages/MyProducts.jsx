@@ -96,7 +96,7 @@ export default function MyProducts() {
   };
 
   const toggleStatus = async (p) => {
-    const next = p.status === "available" ? "unavailable" : "available";
+    const next = p.status === "available" ? "inactive" : "available";
     try {
       // Optimistic UI
       setProducts((prev) =>
@@ -194,8 +194,10 @@ export default function MyProducts() {
           className="border p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-rose-200"
         >
           <option value="">All Status</option>
+          <option value="pending_approval">Pending Approval</option>
           <option value="available">Available</option>
-          <option value="unavailable">Unavailable</option>
+          <option value="inactive">Inactive</option>
+          <option value="rejected">Rejected</option>
         </select>
         <select
           value={sortKey}
@@ -282,7 +284,7 @@ export default function MyProducts() {
                   title="Toggle availability"
                 >
                   {p.status === "available"
-                    ? "Make Unavailable"
+                    ? "Make Inactive"
                     : "Make Available"}
                 </button>
 

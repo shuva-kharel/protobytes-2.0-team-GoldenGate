@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/authStore";
 import { axiosClient } from "../../../api/axiosClient";
+import { authApi } from "../../../api/authApi";
 
 /**
  * Helper to get a safe avatar URL
@@ -98,12 +99,48 @@ function KycBadge({ status }) {
   );
 }
 
+function parseDevice(userAgent = "") {
+  const ua = String(userAgent).toLowerCase();
+  const isMobile = /mobile|android|iphone|ipad/.test(ua);
+  const browser = ua.includes("edg/")
+    ? "Edge"
+    : ua.includes("firefox/")
+      ? "Firefox"
+      : ua.includes("safari/") && !ua.includes("chrome/")
+        ? "Safari"
+        : ua.includes("chrome/")
+          ? "Chrome"
+          : "Browser";
+  const os = ua.includes("windows")
+    ? "Windows"
+    : ua.includes("mac os")
+      ? "macOS"
+      : ua.includes("linux")
+        ? "Linux"
+        : ua.includes("android")
+          ? "Android"
+          : ua.includes("iphone") || ua.includes("ios")
+            ? "iOS"
+            : "OS";
+  return { browser, os, type: isMobile ? "Mobile" : "Desktop" };
+}
+
+function getCookie(name) {
+  const prefixed = `${name}=`;
+  const parts = document.cookie.split(";").map((v) => v.trim());
+  const found = parts.find((p) => p.startsWith(prefixed));
+  return found ? decodeURIComponent(found.slice(prefixed.length)) : "";
+}
+
 export default function Settings() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, logout } = useAuth();
 
   // Sessions
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionFilter, setSessionFilter] = useState("all");
+  const [sessionSearch, setSessionSearch] = useState("");
+  const [sessionActionLoading, setSessionActionLoading] = useState("");
 
   // Profile form state
   const [savingProfile, setSavingProfile] = useState(false);
@@ -117,10 +154,24 @@ export default function Settings() {
 
   // Password
   const [changingPassword, setChangingPassword] = useState(false);
+  const [twoFactor, setTwoFactor] = useState({
+    enabled: false,
+    method: "email",
+    hasAuthenticator: false,
+  });
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [twoFABusy, setTwoFABusy] = useState("");
+  const [setupOtp, setSetupOtp] = useState("");
+  const [authSetup, setAuthSetup] = useState({
+    qrCodeUrl: "",
+    manualKey: "",
+  });
 
   // KYC state
   const [kyc, setKyc] = useState(null);
   const [kycLoading, setKycLoading] = useState(false);
+
+  const currentDeviceId = useMemo(() => getCookie("device_id"), []);
 
   useEffect(() => {
     if (user) {
@@ -133,9 +184,9 @@ export default function Settings() {
         previewUrl: "",
       }));
       fetchKyc();
+      fetchTwoFactorSettings();
     }
     loadSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchKyc = async () => {
@@ -153,12 +204,28 @@ export default function Settings() {
   const loadSessions = async () => {
     setLoadingSessions(true);
     try {
-      const res = await axiosClient.get("/auth/sessions");
+      const res = await authApi.listSessions();
       setSessions(res.data.sessions || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingSessions(false);
+    }
+  };
+
+  const fetchTwoFactorSettings = async () => {
+    setTwoFALoading(true);
+    try {
+      const res = await authApi.get2FASettings();
+      setTwoFactor(res.data?.twoFactor || {
+        enabled: false,
+        method: "email",
+        hasAuthenticator: false,
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTwoFALoading(false);
     }
   };
 
@@ -214,11 +281,102 @@ export default function Settings() {
   const revokeSession = async (id) => {
     if (!confirm("Revoke this session? It will be signed out.")) return;
     try {
-      await axiosClient.post(`/auth/sessions/revoke/${id}`);
+      setSessionActionLoading(id);
+      await authApi.revokeSession(id);
+      if (sessions.find((s) => s._id === id)?.isCurrentSession) {
+        await logout();
+        return;
+      }
       await loadSessions();
     } catch (err) {
       console.error(err);
       alert("Failed to revoke session");
+    } finally {
+      setSessionActionLoading("");
+    }
+  };
+
+  const revokeOtherSessions = async () => {
+    if (!confirm("Revoke all other active sessions?")) return;
+    try {
+      setSessionActionLoading("others");
+      await authApi.revokeOtherSessions();
+      await loadSessions();
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.message || "Failed to revoke other sessions");
+    } finally {
+      setSessionActionLoading("");
+    }
+  };
+
+  const enableEmail2FA = async () => {
+    try {
+      setTwoFABusy("email");
+      const res = await authApi.enableEmail2FA();
+      setTwoFactor(res.data?.twoFactor || twoFactor);
+      setAuthSetup({ qrCodeUrl: "", manualKey: "" });
+      setSetupOtp("");
+      alert("Email 2FA enabled");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to enable email 2FA");
+    } finally {
+      setTwoFABusy("");
+    }
+  };
+
+  const startAuthenticator = async () => {
+    try {
+      setTwoFABusy("auth-setup");
+      const res = await authApi.startAuthenticatorSetup();
+      setAuthSetup({
+        qrCodeUrl: res.data?.qrCodeUrl || "",
+        manualKey: res.data?.manualKey || "",
+      });
+      setSetupOtp("");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to start authenticator setup");
+    } finally {
+      setTwoFABusy("");
+    }
+  };
+
+  const verifyAuthenticator = async () => {
+    if ((setupOtp || "").trim().length !== 6) {
+      alert("Enter a valid 6-digit authenticator code");
+      return;
+    }
+    try {
+      setTwoFABusy("auth-verify");
+      const res = await authApi.verifyAuthenticatorSetup({ otp: setupOtp.trim() });
+      setTwoFactor(res.data?.twoFactor || twoFactor);
+      setAuthSetup({ qrCodeUrl: "", manualKey: "" });
+      setSetupOtp("");
+      alert("Authenticator 2FA enabled");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to verify authenticator setup");
+    } finally {
+      setTwoFABusy("");
+    }
+  };
+
+  const disable2FA = async () => {
+    if (!confirm("Disable 2FA for your account?")) return;
+    try {
+      setTwoFABusy("disable");
+      const res = await authApi.disable2FA();
+      setTwoFactor(res.data?.twoFactor || {
+        enabled: false,
+        method: "email",
+        hasAuthenticator: false,
+      });
+      setAuthSetup({ qrCodeUrl: "", manualKey: "" });
+      setSetupOtp("");
+      alert("2FA disabled");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to disable 2FA");
+    } finally {
+      setTwoFABusy("");
     }
   };
 
@@ -237,6 +395,26 @@ export default function Settings() {
     const previewUrl = URL.createObjectURL(file);
     setForm((prev) => ({ ...prev, profilePicture: file, previewUrl }));
   };
+
+  const sessionStats = useMemo(() => {
+    const active = sessions.filter((s) => !s.revokedAt).length;
+    const revoked = sessions.filter((s) => !!s.revokedAt).length;
+    return { total: sessions.length, active, revoked };
+  }, [sessions]);
+
+  const visibleSessions = useMemo(() => {
+    const q = sessionSearch.trim().toLowerCase();
+    return sessions.filter((s) => {
+      if (sessionFilter === "active" && s.revokedAt && !s.isCurrentSession)
+        return false;
+      if (sessionFilter === "revoked" && !s.revokedAt) return false;
+      if (!q) return true;
+      return (
+        String(s.userAgent || "").toLowerCase().includes(q) ||
+        String(s.ip || "").toLowerCase().includes(q)
+      );
+    });
+  }, [sessions, sessionFilter, sessionSearch]);
 
   if (!user) return null;
 
@@ -268,6 +446,9 @@ export default function Settings() {
             {/* Show KYC action on the right */}
             <div className="flex items-center gap-3">
               <KycBadge status={kycStatus} />
+              {kycLoading && (
+                <span className="text-xs text-gray-500">Checking KYC...</span>
+              )}
               {kycStatus !== "approved" && (
                 <Link
                   to="/kyc"
@@ -471,27 +652,210 @@ export default function Settings() {
         </form>
       </section>
 
+      {/* TWO FACTOR */}
+      <section className="rounded-xl border bg-white/70 backdrop-blur p-6 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-semibold text-xl">Two-Factor Authentication</h2>
+            <p className="text-sm text-gray-500">
+              OTP is required only when 2FA is enabled.
+            </p>
+          </div>
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium border ${
+              twoFactor.enabled
+                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                : "bg-slate-100 text-slate-700 border-slate-200"
+            }`}
+          >
+            {twoFactor.enabled ? `Enabled (${twoFactor.method})` : "Disabled"}
+          </span>
+        </div>
+
+        {twoFALoading ? (
+          <div className="text-sm text-gray-500">Loading 2FA settings...</div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={enableEmail2FA}
+                disabled={twoFABusy === "email"}
+                className="px-3 py-1.5 rounded-md bg-rose-600 text-white text-sm hover:bg-rose-700 disabled:opacity-60"
+              >
+                {twoFABusy === "email" ? "Enabling..." : "Use Email 2FA"}
+              </button>
+              <button
+                type="button"
+                onClick={startAuthenticator}
+                disabled={twoFABusy === "auth-setup"}
+                className="px-3 py-1.5 rounded-md border text-sm hover:bg-gray-50 disabled:opacity-60"
+              >
+                {twoFABusy === "auth-setup"
+                  ? "Preparing..."
+                  : twoFactor.method === "authenticator" && twoFactor.enabled
+                    ? "Reconfigure Authenticator"
+                    : "Use Google Authenticator"}
+              </button>
+              {twoFactor.enabled && (
+                <button
+                  type="button"
+                  onClick={disable2FA}
+                  disabled={twoFABusy === "disable"}
+                  className="px-3 py-1.5 rounded-md border border-rose-200 text-rose-700 text-sm hover:bg-rose-50 disabled:opacity-60"
+                >
+                  {twoFABusy === "disable" ? "Disabling..." : "Disable 2FA"}
+                </button>
+              )}
+            </div>
+
+            {authSetup.qrCodeUrl && (
+              <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4 space-y-3">
+                <p className="text-sm text-slate-700">
+                  Scan this QR in Google Authenticator, then enter the 6-digit code.
+                </p>
+                <img
+                  src={authSetup.qrCodeUrl}
+                  alt="Authenticator QR"
+                  className="h-44 w-44 rounded border bg-white p-2"
+                />
+                <p className="text-xs text-slate-600 break-all">
+                  Manual key: <code>{authSetup.manualKey}</code>
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={setupOtp}
+                    onChange={(e) => setSetupOtp(e.target.value)}
+                    placeholder="123456"
+                    className="w-32 border rounded-md px-2 py-1.5 text-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyAuthenticator}
+                    disabled={twoFABusy === "auth-verify"}
+                    className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {twoFABusy === "auth-verify" ? "Verifying..." : "Verify & Enable"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
       {/* SESSIONS */}
       <section className="rounded-xl border bg-white/70 backdrop-blur p-6 shadow-sm">
-        <h2 className="font-semibold text-xl mb-3">Active Sessions</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="font-semibold text-xl">Active Sessions</h2>
+            <p className="text-sm text-gray-500">
+              Manage where your account is logged in.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={loadSessions}
+              className="text-sm px-3 py-1.5 rounded-md border hover:bg-gray-50"
+              disabled={loadingSessions}
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={revokeOtherSessions}
+              disabled={
+                sessionActionLoading === "others" || sessionStats.active <= 1
+              }
+              className="text-sm px-3 py-1.5 rounded-md bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
+            >
+              {sessionActionLoading === "others"
+                ? "Revoking..."
+                : "Revoke Other Sessions"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-2 mb-4 text-sm">
+          <div className="rounded-lg border bg-white px-3 py-2">
+            <span className="text-gray-500">Total</span>
+            <div className="font-semibold">{sessionStats.total}</div>
+          </div>
+          <div className="rounded-lg border bg-white px-3 py-2">
+            <span className="text-gray-500">Active</span>
+            <div className="font-semibold text-emerald-700">
+              {sessionStats.active}
+            </div>
+          </div>
+          <div className="rounded-lg border bg-white px-3 py-2">
+            <span className="text-gray-500">Revoked</span>
+            <div className="font-semibold text-rose-700">
+              {sessionStats.revoked}
+            </div>
+          </div>
+        </div>
+
+        {sessions.find((s) => s.isCurrentSession) && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-800">
+            Current device is recognized and kept active when using
+            <strong> Revoke Other Sessions</strong>.
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <select
+            value={sessionFilter}
+            onChange={(e) => setSessionFilter(e.target.value)}
+            className="border rounded-md px-2 py-1.5 text-sm bg-white"
+          >
+            <option value="active">Active only</option>
+            <option value="all">All sessions</option>
+            <option value="revoked">Revoked only</option>
+          </select>
+          <input
+            type="text"
+            value={sessionSearch}
+            onChange={(e) => setSessionSearch(e.target.value)}
+            className="border rounded-md px-3 py-1.5 text-sm bg-white"
+            placeholder="Search by device or IP..."
+          />
+        </div>
 
         {loadingSessions ? (
           <div className="text-sm text-gray-500">Loading sessions…</div>
-        ) : sessions.length === 0 ? (
-          <div className="text-sm text-gray-500">No active sessions.</div>
+        ) : visibleSessions.length === 0 ? (
+          <div className="text-sm text-gray-500">
+            No sessions match your current filter.
+          </div>
         ) : (
           <div className="space-y-2">
-            {sessions.map((s) => {
+            {visibleSessions.map((s) => {
               const revoked = !!s.revokedAt;
+              const current =
+                !!s.isCurrentSession ||
+                (!!currentDeviceId && s.deviceId === currentDeviceId);
+              const parsed = parseDevice(s.userAgent || "");
               return (
                 <div
                   key={s._id}
-                  className={`flex justify-between items-center border p-3 rounded ${
+                  className={`flex justify-between items-center border p-3 rounded-lg ${
                     revoked ? "opacity-60" : ""
                   }`}
                 >
                   <div className="min-w-0">
-                    <p className="text-sm truncate">
+                    <p className="text-sm truncate font-medium">
+                      {parsed.browser} on {parsed.os} ({parsed.type})
+                      {current && (
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                          Current
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
                       {s.userAgent || "Unknown device"}
                     </p>
                     <p className="text-xs text-gray-500">
@@ -509,9 +873,10 @@ export default function Settings() {
                   {!revoked && (
                     <button
                       onClick={() => revokeSession(s._id)}
-                      className="text-red-600 text-sm hover:underline"
+                      disabled={sessionActionLoading === s._id}
+                      className="text-red-600 text-sm hover:underline disabled:opacity-60"
                     >
-                      Revoke
+                      {sessionActionLoading === s._id ? "Revoking..." : "Revoke"}
                     </button>
                   )}
                 </div>

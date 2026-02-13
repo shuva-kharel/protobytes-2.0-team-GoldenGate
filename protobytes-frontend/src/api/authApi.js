@@ -34,12 +34,37 @@ export const authApi = {
     return axiosClient.post("/auth/2fa/resend", {});
   },
 
+  get2FASettings() {
+    return axiosClient.get("/auth/2fa/settings");
+  },
+
+  enableEmail2FA() {
+    return axiosClient.post("/auth/2fa/email/enable", {});
+  },
+
+  startAuthenticatorSetup() {
+    return axiosClient.post("/auth/2fa/authenticator/setup", {});
+  },
+
+  verifyAuthenticatorSetup(payload) {
+    return axiosClient.post("/auth/2fa/authenticator/verify", payload);
+  },
+
+  disable2FA() {
+    return axiosClient.post("/auth/2fa/disable", {});
+  },
+
   // ✅ Session / User
   me() {
     return axiosClient.get("/auth/me");
   },
 
   refresh() {
+    return axiosClient.post("/auth/refresh", {});
+  },
+
+  // Backward-compatible alias used in older code paths
+  refreshToken() {
     return axiosClient.post("/auth/refresh", {});
   },
 
@@ -72,5 +97,9 @@ export const authApi = {
 
   revokeAllSessions() {
     return axiosClient.delete("/auth/sessions");
+  },
+
+  revokeOtherSessions() {
+    return axiosClient.post("/auth/sessions/revoke-others");
   },
 };
