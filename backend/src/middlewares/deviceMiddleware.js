@@ -1,5 +1,6 @@
 // src/middlewares/deviceMiddleware.js
 const crypto = require("crypto");
+const { resolveCookieDomain } = require("../utils/cookies");
 
 module.exports = function deviceMiddleware(req, res, next) {
   // Read device_id from cookies
@@ -8,6 +9,7 @@ module.exports = function deviceMiddleware(req, res, next) {
   // If missing, create a stable device ID and store in cookie
   if (!deviceId) {
     deviceId = crypto.randomUUID();
+    const domain = resolveCookieDomain();
 
     res.cookie("device_id", deviceId, {
       httpOnly: false, // set true if you never need to read it in frontend
@@ -15,7 +17,7 @@ module.exports = function deviceMiddleware(req, res, next) {
       sameSite: "lax",
       maxAge: 1000 * 60 * 60 * 24 * 365, // 1 year
       path: "/",
-      domain: process.env.COOKIE_DOMAIN || undefined,
+      domain,
     });
   }
 

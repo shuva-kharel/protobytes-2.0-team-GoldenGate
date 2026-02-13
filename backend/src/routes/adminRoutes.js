@@ -9,6 +9,13 @@ const {
   approveKyc,
   rejectKyc,
   getKycImagesSigned,
+  listProductsForReview,
+  approveProduct,
+  rejectProduct,
+  listUsers,
+  sendUserResetLink,
+  reports,
+  settingsSummary,
 } = require("../controllers/adminController");
 
 router.use(asyncHandler(protect));
@@ -20,5 +27,12 @@ router.get("/stats", asyncHandler(stats));
 router.patch("/kyc/:id/approve", asyncHandler(approveKyc));
 router.patch("/kyc/:id/reject", asyncHandler(rejectKyc));
 router.get("/kyc/:id/images", asyncHandler(getKycImagesSigned));
+router.get("/products", asyncHandler(listProductsForReview));
+router.patch("/products/:id/approve", asyncHandler(approveProduct));
+router.patch("/products/:id/reject", asyncHandler(rejectProduct));
+router.get("/users", asyncHandler(listUsers));
+router.post("/users/:id/send-reset", asyncHandler(sendUserResetLink));
+router.get("/reports", asyncHandler(reports));
+router.get("/settings", asyncHandler(settingsSummary));
 
 module.exports = router;

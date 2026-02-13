@@ -4,6 +4,20 @@ const cloudinary = require("../config/cloudinary");
 const { uploadBufferToCloudinary } = require("../utils/cloudinaryUpload");
 const logger = require("../utils/logger");
 
+function toPublicProfile(user) {
+  return {
+    _id: user._id,
+    username: user.username,
+    fullName: user.fullName || "",
+    bio: user.bio || "",
+    profilePicture:
+      typeof user.profilePicture === "string"
+        ? user.profilePicture
+        : user.profilePicture?.url || "",
+    joinedAt: user.createdAt,
+  };
+}
+
 // POST /api/user/update-profile
 const updateProfile = async (req, res, next) => {
   try {
@@ -65,4 +79,34 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
-module.exports = { updateProfile };
+// GET /api/user/id/:id
+const getPublicProfileById = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select("username fullName bio profilePicture createdAt")
+      .lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ profile: toPublicProfile(user) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/user/username/:username
+const getPublicProfileByUsername = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ username: req.params.username })
+      .select("username fullName bio profilePicture createdAt")
+      .lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ profile: toPublicProfile(user) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  updateProfile,
+  getPublicProfileById,
+  getPublicProfileByUsername,
+};

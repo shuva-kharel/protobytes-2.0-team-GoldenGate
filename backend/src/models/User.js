@@ -7,10 +7,25 @@ const otpSchema = new mongoose.Schema({
   attempts: { type: Number, default: 0 },
 });
 
+const twoFactorSchema = new mongoose.Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    method: {
+      type: String,
+      enum: ["email", "authenticator"],
+      default: "email",
+    },
+    authenticatorSecret: { type: String, default: "" },
+    pendingAuthenticatorSecret: { type: String, default: "" },
+    loginChallenge: { type: otpSchema, default: () => ({}) },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
-    username: { type: String, required: true, trim: true },
-    fullName: { type: String, required: true, trim: true },
+    username: { type: String, required: true, unique: true, trim: true },
+    fullName: { type: String, default: "", trim: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
 
@@ -22,7 +37,7 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ["admin", "user"], default: "user", index: true },
 
     // 2FA for login
-    twoFactor: { type: otpSchema, default: () => ({}) },
+    twoFactor: { type: twoFactorSchema, default: () => ({}) },
 
     // Account verification OTP (register flow)
     otp: { type: otpSchema, default: () => ({}) },
@@ -36,9 +51,7 @@ const userSchema = new mongoose.Schema(
       url: { type: String, default: "" },
       publicId: { type: String, default: "" },
     },
-    fullName: { type: String, default: "" },
     bio: { type: String, default: "" },
-    username: { type: String, required: true, unique: true, trim: true },
   },
   { timestamps: true }
 );

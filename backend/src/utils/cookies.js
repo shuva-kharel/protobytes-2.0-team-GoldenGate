@@ -1,10 +1,21 @@
 // utils/cookies.js
+function resolveCookieDomain() {
+  const raw = (process.env.COOKIE_DOMAIN || "").trim();
+  if (!raw) return undefined;
+  const lowered = raw.toLowerCase();
+  if (lowered === "localhost" || lowered === "127.0.0.1" || lowered === "::1") {
+    return undefined;
+  }
+  return raw;
+}
+
 function setAuthCookies(res, accessToken, refreshToken) {
+  const domain = resolveCookieDomain();
   const common = {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === "true",
     sameSite: "lax",
-    domain: process.env.COOKIE_DOMAIN || undefined,
+    domain,
   };
 
   res.cookie("access_token", accessToken, {
@@ -22,8 +33,15 @@ function setAuthCookies(res, accessToken, refreshToken) {
 }
 
 function clearAuthCookies(res) {
-  res.clearCookie("access_token", { path: "/" });
-  res.clearCookie("refresh_token", { path: "/api/auth/refresh" });
+  const domain = resolveCookieDomain();
+  const common = {
+    httpOnly: true,
+    secure: process.env.COOKIE_SECURE === "true",
+    sameSite: "lax",
+    domain,
+  };
+  res.clearCookie("access_token", { ...common, path: "/" });
+  res.clearCookie("refresh_token", { ...common, path: "/api/auth/refresh" });
 }
 
-module.exports = { setAuthCookies, clearAuthCookies };
+module.exports = { setAuthCookies, clearAuthCookies, resolveCookieDomain };

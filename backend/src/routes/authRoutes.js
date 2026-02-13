@@ -9,6 +9,11 @@ const {
   loginUser,
   verify2FA,
   resend2FA,
+  get2FASettings,
+  enableEmail2FA,
+  startAuthenticatorSetup,
+  verifyAuthenticatorSetup,
+  disable2FA,
   refreshToken,
   forgotPassword,
   resetPassword,
@@ -16,7 +21,9 @@ const {
   getProfile,
   updatePassword,           // <-- ADD
   listSessions,
-  revokeSession
+  revokeSession,
+  revokeOtherSessions,
+  revokeAllSessions,
 
 } = require("../controllers/authController");
 
@@ -41,6 +48,11 @@ router.post("/verify-email", verifyOtpValidator, asyncHandler(verifyEmail));
 router.post("/login", loginValidator, asyncHandler(loginUser));
 router.post("/2fa/verify", verify2FAValidator, asyncHandler(verify2FA));
 router.post("/2fa/resend", asyncHandler(resend2FA));
+router.get("/2fa/settings", asyncHandler(protect), asyncHandler(get2FASettings));
+router.post("/2fa/email/enable", asyncHandler(protect), asyncHandler(enableEmail2FA));
+router.post("/2fa/authenticator/setup", asyncHandler(protect), asyncHandler(startAuthenticatorSetup));
+router.post("/2fa/authenticator/verify", verify2FAValidator, asyncHandler(protect), asyncHandler(verifyAuthenticatorSetup));
+router.post("/2fa/disable", asyncHandler(protect), asyncHandler(disable2FA));
 
 // --- NEW: Forgot / Reset password ---
 router.post("/forgot-password", forgotValidator, asyncHandler(forgotPassword));
@@ -67,6 +79,9 @@ router.get(
 
 router.get("/sessions", asyncHandler(protect), asyncHandler(listSessions));
 router.post("/sessions/revoke/:sessionId", asyncHandler(protect), asyncHandler(revokeSession));
+router.delete("/sessions/:sessionId", asyncHandler(protect), asyncHandler(revokeSession));
+router.post("/sessions/revoke-others", asyncHandler(protect), asyncHandler(revokeOtherSessions));
+router.delete("/sessions", asyncHandler(protect), asyncHandler(revokeAllSessions));
 
 
 module.exports = router;

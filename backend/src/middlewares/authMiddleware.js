@@ -16,6 +16,7 @@ async function protect(req, res, next) {
     if (!user) return res.status(401).json({ message: "Not authorized, user missing" });
 
     req.user = user;
+    req.auth = decoded;
     next();
   } catch (err) {
     return res.status(401).json({ message: "Not authorized, token invalid" });

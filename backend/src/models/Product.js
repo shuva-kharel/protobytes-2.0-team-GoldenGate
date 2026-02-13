@@ -9,6 +9,11 @@ const productSchema = new mongoose.Schema(
     borrowPrice: { type: Number, required: true, min: 0 },
 
     productAge: { type: String, default: "" }, // e.g. "6 months"
+    condition: {
+      type: String,
+      enum: ["", "new", "like_new", "good", "fair", "poor"],
+      default: "",
+    },
     location: { type: String, required: true, trim: true, index: true },
     description: { type: String, default: "", trim: true },
 
@@ -22,7 +27,35 @@ const productSchema = new mongoose.Schema(
       username: { type: String, required: true },
     },
 
-    status: { type: String, enum: ["available", "borrowed", "inactive"], default: "available", index: true },
+    status: {
+      type: String,
+      enum: [
+        "pending_approval",
+        "available",
+        "borrowed",
+        "inactive",
+        "rejected",
+      ],
+      default: "pending_approval",
+      index: true,
+    },
+    moderation: {
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+      reviewedAt: { type: Date, default: null },
+      rejectionReason: { type: String, default: "" },
+      aiCheck: {
+        status: {
+          type: String,
+          enum: ["pass", "flagged", "rejected"],
+          default: "pass",
+        },
+        reason: { type: String, default: "" },
+      },
+    },
   },
   { timestamps: true }
 );

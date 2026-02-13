@@ -65,6 +65,7 @@ app.use(hpp());
 // Parsers
 app.use(express.json());
 app.use(cookieParser());
+app.use(deviceMiddleware);
 app.use("/uploads", express.static("uploads"));
 
 /**
@@ -133,10 +134,6 @@ app.get("/", (req, res) => {
 
 // Error handler last
 app.use(errorHandler);
-
-// DeviceMiddleware
-app.use(deviceMiddleware);
-
 
 // SMTP verify (optional)
 transporter

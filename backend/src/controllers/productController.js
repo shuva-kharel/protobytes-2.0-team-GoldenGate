@@ -3,6 +3,30 @@ const cloudinary = require("../config/cloudinary");
 const { uploadBufferToCloudinary } = require("../utils/cloudinaryUpload");
 const logger = require("../utils/logger");
 
+const prohibitedKeywords = [
+  "gun",
+  "weapon",
+  "pistol",
+  "rifle",
+  "drugs",
+  "narcotic",
+  "explosive",
+  "fake id",
+  "counterfeit",
+];
+
+function runProductPolicyCheck({ name = "", description = "" }) {
+  const hay = `${name} ${description}`.toLowerCase();
+  const matched = prohibitedKeywords.find((k) => hay.includes(k));
+  if (matched) {
+    return {
+      status: "rejected",
+      reason: `Blocked by policy keyword: ${matched}`,
+    };
+  }
+  return { status: "pass", reason: "" };
+}
+
 // PUBLIC: GET /api/products
 const getProducts = async (req, res, next) => {
   try {
@@ -60,12 +84,18 @@ const createProduct = async (req, res, next) => {
       borrowPrice,
       location,
       productAge,
+      condition,
       description,
     } = req.body;
 
     if (!name || !category || !borrowPrice || !location) {
       return res.status(400).json({ message: "name, category, borrowPrice, location are required" });
     }
+
+    const aiCheck = runProductPolicyCheck({
+      name,
+      description: description || "",
+    });
 
     const product = new Product({
       name,
@@ -74,12 +104,20 @@ const createProduct = async (req, res, next) => {
       borrowPrice: Number(borrowPrice),
       location,
       productAge: productAge || "",
+      condition: condition || "",
       description: description || "",
       uploadedBy: {
         user: req.user._id,
         username: req.user.username,
       },
-      status: "available",
+      status: aiCheck.status === "rejected" ? "rejected" : "pending_approval",
+      moderation: {
+        aiCheck,
+        rejectionReason:
+          aiCheck.status === "rejected"
+            ? "Automatically rejected by policy screening"
+            : "",
+      },
     });
 
     // Upload image if included
@@ -95,9 +133,24 @@ const createProduct = async (req, res, next) => {
 
     await product.save();
 
-    logger.info("Product created", { productId: product._id, userId: req.user._id });
+    logger.info("Product submitted", {
+      productId: product._id,
+      userId: req.user._id,
+      aiStatus: aiCheck.status,
+    });
 
-    res.status(201).json({ message: "Product created", product });
+    if (aiCheck.status === "rejected") {
+      return res.status(201).json({
+        message:
+          "Product was auto-rejected by safety screening. Please edit and submit again.",
+        product,
+      });
+    }
+
+    res.status(201).json({
+      message: "Product submitted for admin review.",
+      product,
+    });
   } catch (err) {
     next(err);
   }
@@ -114,7 +167,17 @@ const updateProduct = async (req, res, next) => {
       return res.status(403).json({ message: "You can only update your own product" });
     }
 
-    const fields = ["name", "category", "price", "borrowPrice", "location", "productAge", "description", "status"];
+    const fields = [
+      "name",
+      "category",
+      "price",
+      "borrowPrice",
+      "location",
+      "productAge",
+      "condition",
+      "description",
+      "status",
+    ];
     for (const f of fields) {
       if (req.body[f] !== undefined) product[f] = req.body[f];
     }
@@ -130,6 +193,24 @@ const updateProduct = async (req, res, next) => {
         resource_type: "image",
       });
       product.image = { url: upload.secure_url, publicId: upload.public_id };
+    }
+
+    const aiCheck = runProductPolicyCheck({
+      name: product.name,
+      description: product.description,
+    });
+    product.moderation = {
+      ...(product.moderation || {}),
+      aiCheck,
+    };
+    if (aiCheck.status === "rejected") {
+      product.status = "rejected";
+      product.moderation.rejectionReason =
+        "Automatically rejected by policy screening";
+    } else if (product.status !== "available" && product.status !== "borrowed") {
+      // Edited products go back to moderation unless already actively borrowed/approved.
+      product.status = "pending_approval";
+      product.moderation.rejectionReason = "";
     }
 
     await product.save();
