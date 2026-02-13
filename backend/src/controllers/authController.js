@@ -460,20 +460,20 @@ const updatePassword = async (req, res, next) => {
     );
 
     // create fresh session and re-issue tokens
-    const session = await Session.create({
-      user: user._id,
-      deviceId: req.deviceId,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"] || "",
-      refreshTokenHash: "temp",
-      lastUsedAt: new Date(),
-    });
+    // const session = await Session.create({
+    //   user: user._id,
+    //   deviceId: req.deviceId,
+    //   ip: req.ip,
+    //   userAgent: req.headers["user-agent"] || "",
+    //   refreshTokenHash: "temp",
+    //   lastUsedAt: new Date(),
+    // });
 
     const accessToken = signAccessToken({ id: user._id, role: user.role, sid: session._id.toString() });
     const refreshToken = signRefreshToken({ id: user._id, role: user.role, sid: session._id.toString() });
 
-    session.refreshTokenHash = hashToken(refreshToken);
-    await session.save();
+    // session.refreshTokenHash = hashToken(refreshToken);
+    // await session.save();
 
     setAuthCookies(res, accessToken, refreshToken);
 

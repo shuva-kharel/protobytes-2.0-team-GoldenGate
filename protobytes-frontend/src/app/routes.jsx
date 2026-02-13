@@ -26,6 +26,7 @@ import ProtectedRoute from "../components/common/ProtectedRoute";
 import ProductCreation from "../features/products/pages/ProductCreation.jsx";
 import MyProducts from "../features/products/pages/MyProducts.jsx";
 import ProductEdit from "../features/products/pages/ProductEdit.jsx";
+import ChatPage from "../features/chat/pages/ChatPage.jsx";
 
 export const router = createBrowserRouter([
   // ---------------- Auth (no layout) ----------------
@@ -136,6 +137,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ProductEdit />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "chat",
+        element: (
+          <ProtectedRoute>
+            <ChatPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "chat/:userId",
+        element: (
+          <ProtectedRoute>
+            <ChatPage />
           </ProtectedRoute>
         ),
       },

@@ -46,6 +46,13 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-rose-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
+          <Link to="/" className="inline-flex items-center gap-3">
+            <span className="h-3 w-3 rounded-full bg-rose-600 shadow shadow-rose-200" />
+            <span className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
+              ऐँचोपैंचो
+            </span>
+          </Link>
+
           <h1 className="text-3xl font-extrabold text-rose-700 drop-shadow">
             💞 Welcome back
           </h1>
@@ -56,7 +63,7 @@ export default function Login() {
           <form onSubmit={submit} className="space-y-4">
             <Input
               label="Email or Username"
-              placeholder="shuva OR shuva@gmail.com"
+              placeholder="xyz@gmail.com"
               value={form.login}
               onChange={setField("login")}
               autoComplete="username"

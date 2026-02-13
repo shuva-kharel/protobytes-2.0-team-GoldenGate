@@ -4,6 +4,7 @@ const dotenvExpand = require("dotenv-expand");
 dotenvExpand.expand(dotenv.config());
 
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
@@ -23,6 +24,9 @@ const adminRoutes = require("./routes/adminRoutes");
 const productRoutes = require("./routes/productRoutes");
 const borrowRoutes = require("./routes/borrowRoutes");
 const productRequestRoutes = require("./routes/productRequestRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const { Server } = require("socket.io");
+const { registerChatSocket } = require("./sockets/chatSocket");
 
 const deviceMiddleware = require("./middlewares/deviceMiddleware");
 const errorHandler = require("./middlewares/errorHandler");
@@ -30,6 +34,7 @@ const logger = require("./utils/logger");
 const transporter = require("./config/mailer");
 
 const app = express();
+const server = http.createServer(app);
 
 // Trust proxy if behind NGINX/Heroku/Render
 app.set("trust proxy", 1);
@@ -120,6 +125,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/borrow", borrowRoutes);
 app.use("/api/product-requests", productRequestRoutes);
+app.use("/api/chat", chatRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Server is running 🚀" });
@@ -140,7 +146,16 @@ transporter
 
 // Start
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const io = new Server(server, {
+  cors: {
+    origin: (process.env.CLIENT_ORIGIN || "http://localhost:3000").split(","),
+    credentials: true,
+  },
+});
+registerChatSocket(io);
+app.locals.io = io;
+
+server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
   console.log(`Server running on port ${PORT}`);
 });

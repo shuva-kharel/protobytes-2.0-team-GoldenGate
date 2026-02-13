@@ -3,5 +3,46 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  --brand-gradient: linear-gradient(
+    135deg,
+    #f43f5e 0%,
+    #fb7185 40%,
+    #fb923c 100%
+  );
+}
+
+.font-display {
+  font-family:
+    "Noto Sans Devanagari",
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
+  letter-spacing: 0.5px;
+}
+
+.brand-gradient {
+  background-image: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+body {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
 }

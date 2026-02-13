@@ -6,6 +6,7 @@ import { useAuth } from "../authStore";
 import Card from "../../../components/ui/Card";
 import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
+import { setAccessToken } from "../../../api/axiosClient";
 
 export default function TwoFA() {
   const navigate = useNavigate();
@@ -29,9 +30,13 @@ export default function TwoFA() {
 
     try {
       setLoading(true);
-      await authApi.verify2FA({ otp: otp.trim() });
 
-      await loadMe(); // now user is authenticated
+      const res = await authApi.verify2FA({ otp: otp.trim() });
+
+      // ✅ store access token in memory
+      setAccessToken(res.data.token);
+
+      await loadMe();
       navigate("/");
     } catch (err) {
       setError(err?.response?.data?.message || "2FA verification failed.");

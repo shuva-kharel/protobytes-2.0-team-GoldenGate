@@ -9,7 +9,7 @@ export default function ProtectedRoute({ children, roles = [] }) {
   if (booting) return <div>Loading…</div>;
 
   // Not logged in
-  if (!user) return <Navigate to="/auth/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
 
   // Role check (if roles array is provided)
   if (roles.length > 0 && !roles.includes(user.role)) {

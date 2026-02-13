@@ -1,78 +1,97 @@
-// src/features/auth/pages/ForgotPassword.jsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { authApi } from "../../../api/authApi";
-import Card from "../../../components/ui/Card";
-import Input from "../../../components/ui/Input";
-import Button from "../../../components/ui/Button";
+import { axiosClient } from "../../../api/axiosClient";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [info, setInfo] = useState("");
-  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState("");
 
   const submit = async (e) => {
     e.preventDefault();
-    setError("");
-    setInfo("");
-
-    if (!email.includes("@")) return setError("Valid email required.");
-
+    setErr("");
     try {
-      setLoading(true);
-      await authApi.forgotPassword({ email: email.trim() });
-      setInfo("If that email exists, a reset link was sent 💌");
-    } catch (err) {
-      setError(err?.response?.data?.message || "Failed to send reset email.");
+      setSubmitting(true);
+      await axiosClient.post("/auth/forgot-password", { email });
+      setSent(true);
+    } catch (error) {
+      setErr(error?.response?.data?.message || "Failed to send reset link");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-rose-100 flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="text-3xl font-extrabold text-rose-700 drop-shadow">
-            💌 Forgot password
-          </h1>
-          <p className="mt-2 text-rose-600">We’ll send you a reset link.</p>
+    <div className="min-h-screen relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-rose-50 via-white to-orange-50" />
+      <div className="absolute -top-20 -right-16 h-72 w-72 bg-rose-100 rounded-full blur-3xl opacity-60" />
+      <div className="absolute -bottom-24 -left-16 h-64 w-64 bg-orange-100 rounded-full blur-3xl opacity-60" />
+
+      <div className="relative max-w-6xl mx-auto px-4 py-10">
+        <Link to="/" className="inline-flex items-center gap-3">
+          <span className="h-3 w-3 rounded-full bg-rose-600 shadow shadow-rose-200" />
+          <span className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
+            ऐँचोपैंचो
+          </span>
+        </Link>
+
+        <div className="mt-10 mx-auto max-w-md">
+          <div className="rounded-2xl border border-rose-100 bg-white shadow-sm p-6">
+            <h1 className="text-xl font-semibold text-gray-900">
+              💌 Forgot password
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              We’ll send you a reset link.
+            </p>
+
+            {sent ? (
+              <div className="mt-6 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded p-3">
+                If an account exists for <strong>{email}</strong>, a reset link
+                has been sent. Please check your inbox (and spam).
+              </div>
+            ) : (
+              <form onSubmit={submit} className="mt-6 space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1 w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                    placeholder="you@example.com"
+                  />
+                </div>
+
+                {err && (
+                  <div className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded p-2">
+                    {err}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-2.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
+                >
+                  {submitting ? "Sending…" : "Send reset link 💖"}
+                </button>
+
+                <div className="text-right">
+                  <Link
+                    to="/login"
+                    className="text-sm text-rose-700 hover:text-rose-900"
+                  >
+                    Back to login
+                  </Link>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
-
-        <Card className="p-6 shadow-glow border border-rose-200">
-          <form onSubmit={submit} className="space-y-4">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-
-            {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            {info && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-                {info}
-              </div>
-            )}
-
-            <Button className="w-full" disabled={loading} type="submit">
-              {loading ? "Sending…" : "Send reset link 💖"}
-            </Button>
-          </form>
-
-          <p className="mt-4 text-center text-sm text-rose-700">
-            <Link to="/login" className="underline hover:text-rose-900">
-              Back to login
-            </Link>
-          </p>
-        </Card>
       </div>
     </div>
   );
