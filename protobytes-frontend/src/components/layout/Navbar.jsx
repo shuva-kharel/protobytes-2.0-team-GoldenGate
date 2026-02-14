@@ -2,11 +2,22 @@ import { Link } from "react-router-dom";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../../features/auth/authStore";
 
+// Icons
+import {
+  MdAddCircleOutline,
+  MdSettings,
+  MdBuild,
+  MdKeyboardArrowDown,
+} from "react-icons/md";
+import { AiOutlineInbox } from "react-icons/ai";
+import { FiLogOut } from "react-icons/fi";
+import { HiMiniChatBubbleLeftRight } from "react-icons/hi2";
+import { FaRegCircleUser, FaBoxOpen } from "react-icons/fa6";
+
 /** Normalize profile picture to string URL */
 function getProfilePictureUrl(user) {
   if (!user) return "";
   const pic = user.profilePicture;
-  if (!pic) return "";
   return typeof pic === "string" ? pic : pic?.url || "";
 }
 
@@ -72,22 +83,24 @@ export default function Navbar() {
     setProductsDropdownOpen(false);
   }, []);
 
-  // Close on outside click
+  // Close dropdowns on outside click or ESC
   useEffect(() => {
     function handleClickOutside(event) {
       const u = userDropdownRef.current;
       const p = productsDropdownRef.current;
-      if (u && !u.contains(event.target) && p && !p.contains(event.target)) {
-        closeAll();
-      } else if (u && !u.contains(event.target) && !p) {
-        closeAll();
-      } else if (p && !p.contains(event.target) && !u) {
+
+      if (
+        (!u || (u && !u.contains(event.target))) &&
+        (!p || (p && !p.contains(event.target)))
+      ) {
         closeAll();
       }
     }
+
     function handleEsc(event) {
       if (event.key === "Escape") closeAll();
     }
+
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEsc);
     return () => {
@@ -100,23 +113,24 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-rose-100 bg-white/75 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
-        <Link to="/home" className="flex items-center gap-3 group">
-          {/* Logo */}
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        {/* Logo as image */}
+        <Link to="/home" className="flex items-center gap-3">
           <img src="/logo.png" alt="Logo" className="h-14 w-auto" />
         </Link>
 
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-2">
+          {/* Primary Links */}
           <Link
             to="/home"
-            className="text-sm font-semibold text-rose-700 hover:text-rose-900"
+            className="px-3 py-2 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 hover:text-rose-900 transition"
           >
             Browse
           </Link>
 
           <Link
             to="/requests"
-            className="text-sm font-semibold text-rose-700 hover:text-rose-900"
+            className="px-3 py-2 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 hover:text-rose-900 transition"
           >
             Requests
           </Link>
@@ -125,110 +139,120 @@ export default function Navbar() {
           <div className="relative" ref={productsDropdownRef}>
             <button
               onClick={() => setProductsDropdownOpen((prev) => !prev)}
-              className="text-sm font-semibold text-rose-700 hover:text-rose-900 inline-flex items-center gap-1"
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 hover:text-rose-900 transition inline-flex items-center gap-1"
             >
               Products
-              <svg
-                className={`h-4 w-4 transition ${productsDropdownOpen ? "rotate-180" : ""}`}
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.08 1.04l-4.25 4.25a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" />
-              </svg>
+              <MdKeyboardArrowDown
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  productsDropdownOpen ? "rotate-180" : ""
+                }`}
+              />
             </button>
 
             {productsDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-52 rounded-xl border border-rose-100 bg-white shadow-lg p-2 space-y-1">
+              <div className="absolute right-0 mt-3 w-56 rounded-2xl border border-rose-100 bg-white shadow-xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100">
                 <Link
                   to="/products/new"
-                  className="block rounded-lg px-3 py-2 text-sm hover:bg-rose-50"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-rose-50 transition"
                   onClick={() => setProductsDropdownOpen(false)}
                 >
-                  Create Product
+                  <MdAddCircleOutline className="text-rose-600" />
+                  <span>Create Product</span>
                 </Link>
 
                 <Link
                   to="/products/mine"
-                  className="block rounded-lg px-3 py-2 text-sm hover:bg-rose-50"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-rose-50 transition"
                   onClick={() => setProductsDropdownOpen(false)}
                 >
-                  My Products
+                  <FaBoxOpen className="text-rose-600" />
+                  <span>My Products</span>
                 </Link>
 
                 <Link
                   to="/requests/new"
-                  className="block rounded-lg px-3 py-2 text-sm hover:bg-rose-50"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-rose-50 transition"
                   onClick={() => setProductsDropdownOpen(false)}
                 >
-                  Create Request
+                  <AiOutlineInbox className="text-rose-600" />
+                  <span>Create Request</span>
                 </Link>
               </div>
             )}
           </div>
 
+          {/* Chat Link */}
           {user && (
             <Link
               to="/chat"
-              className="text-sm font-semibold text-rose-700 hover:text-rose-900"
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 hover:text-rose-900 transition flex items-center gap-1"
             >
-              Chat
+              <HiMiniChatBubbleLeftRight />
+              <span>Chat</span>
             </Link>
           )}
 
-          {/* User Dropdown */}
+          {/* Divider */}
+          <div className="h-6 w-px bg-rose-100 mx-2" />
+
+          {/* User Section */}
           {user ? (
             <div className="relative" ref={userDropdownRef}>
               <button
                 onClick={() => setUserDropdownOpen((prev) => !prev)}
-                className="relative focus:outline-none"
-                aria-label="Open user menu"
+                className="flex items-center gap-2 rounded-full px-2 py-1 hover:bg-rose-50 transition"
               >
                 <Avatar
                   src={avatarUrl}
                   name={user.fullName || user.username}
                   className="h-9 w-9"
                 />
-                {user.kycStatus === "approved" && (
-                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
-                )}
+                <span className="text-sm font-medium text-rose-800 hidden sm:block">
+                  {user.fullName || user.username}
+                </span>
               </button>
 
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-xl border border-rose-100 bg-white shadow-lg p-2 space-y-1">
+                <div className="absolute right-0 mt-3 w-52 rounded-2xl border border-rose-100 bg-white shadow-xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100">
                   <Link
                     to="/settings"
-                    className="block rounded-lg px-3 py-2 text-sm hover:bg-rose-50"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-rose-50 transition"
                     onClick={() => setUserDropdownOpen(false)}
                   >
-                    Account
+                    <MdSettings className="text-rose-600" />
+                    <span>Account</span>
                   </Link>
 
                   {user.role === "admin" && (
                     <Link
                       to="/admin/dashboard"
-                      className="block rounded-lg px-3 py-2 text-sm hover:bg-rose-50"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-rose-50 transition"
                       onClick={() => setUserDropdownOpen(false)}
                     >
-                      Admin Dashboard
+                      <MdBuild className="text-rose-600" />
+                      <span>Admin Dashboard</span>
                     </Link>
                   )}
+
+                  <div className="h-px bg-rose-100 my-1" />
 
                   <button
                     onClick={() => {
                       logout();
                       setUserDropdownOpen(false);
                     }}
-                    className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-rose-50 text-red-500"
+                    className="flex items-center gap-3 w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-rose-50 text-red-500 transition"
                   >
-                    Logout
+                    <FiLogOut />
+                    <span>Logout</span>
                   </button>
                 </div>
               )}
             </div>
           ) : (
             <Link
-              className="text-sm font-semibold text-rose-700 hover:text-rose-900"
               to="/login"
+              className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 transition shadow-sm"
             >
               Login
             </Link>
