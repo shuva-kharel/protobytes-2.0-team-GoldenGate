@@ -148,10 +148,7 @@ export default function ResetPassword() {
 
       <div className="relative max-w-6xl mx-auto px-4 py-10">
         <Link to="/" className="inline-flex items-center gap-3">
-          <span className="h-3 w-3 rounded-full bg-rose-600 shadow shadow-rose-200" />
-          <span className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
-            ऐँचोपैंचो
-          </span>
+          <img src="/logo.png" alt="Logo" className="h-24 w-auto" />
         </Link>
 
         <div className="mt-10 mx-auto max-w-md">

@@ -53,7 +53,7 @@ export default function TwoFA() {
       setError("");
       setInfo("");
       await authApi.resend2FA();
-      setInfo("New OTP sent to your email 💌");
+      setInfo("New OTP sent to your email.");
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to resend OTP.");
     } finally {
@@ -99,7 +99,7 @@ export default function TwoFA() {
             )}
 
             <Button className="w-full" disabled={loading} type="submit">
-              {loading ? "Verifying…" : "Verify 💖"}
+              {loading ? "Verifying…" : "Verify"}
             </Button>
           </form>
 

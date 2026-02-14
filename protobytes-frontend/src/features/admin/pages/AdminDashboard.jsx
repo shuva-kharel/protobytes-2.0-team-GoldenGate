@@ -139,9 +139,12 @@ export default function AdminDashboard() {
         <section className="rounded-2xl border border-rose-100 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
-                ऐँचोपैंचो Admin Control Center
-              </h1>
+              <div className="flex items-center gap-3">
+                <img src="/logo.png" alt="Logo" className="h-14 w-auto" />
+                <h1 className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
+                  Admin Control Center
+                </h1>
+              </div>
               <p className="mt-1 text-sm text-slate-600">
                 Moderate KYC, monitor trust metrics, and keep platform quality high.
               </p>

@@ -38,7 +38,7 @@ export default function VerifyEmail() {
     try {
       setLoading(true);
       await authApi.verifyEmail({ email: email.trim(), otp: otp.trim() });
-      setInfo("Email verified successfully 💖 Redirecting to login...");
+      setInfo("Email verified successfully! Redirecting to login...");
       setTimeout(() => navigate("/login"), 900);
     } catch (err) {
       setError(err?.response?.data?.message || "Email verification failed.");
@@ -53,7 +53,7 @@ export default function VerifyEmail() {
       setError("");
       setInfo("");
       await authApi.resendEmailOtp({ email: email.trim() });
-      setInfo("OTP resent to your email 💌");
+      setInfo("OTP resent to your email.");
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to resend OTP.");
     } finally {
@@ -103,7 +103,7 @@ export default function VerifyEmail() {
             )}
 
             <Button className="w-full" disabled={loading} type="submit">
-              {loading ? "Verifying…" : "Verify Email 💘"}
+              {loading ? "Verifying…" : "Verify Email"}
             </Button>
           </form>
 

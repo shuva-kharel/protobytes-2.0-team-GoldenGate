@@ -58,14 +58,11 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <Link to="/" className="inline-flex items-center gap-3">
-            <span className="h-3 w-3 rounded-full bg-rose-600 shadow shadow-rose-200" />
-            <span className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
-              ऐँचोपैंचो
-            </span>
+            <img src="/logo.png" alt="Logo" className="h-24 w-auto" />
           </Link>
 
           <h1 className="text-3xl font-extrabold text-rose-700 drop-shadow">
-            💞 Welcome back
+            Welcome back
           </h1>
           <p className="mt-2 text-rose-600">Login with email or username.</p>
         </div>
@@ -96,7 +93,7 @@ export default function Login() {
             )}
 
             <Button className="w-full" disabled={loading} type="submit">
-              {loading ? "Checking…" : "Continue 💌"}
+              {loading ? "Checking…" : "Continue"}
             </Button>
           </form>
 

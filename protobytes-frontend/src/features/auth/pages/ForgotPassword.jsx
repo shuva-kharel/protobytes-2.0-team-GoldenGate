@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { axiosClient } from "../../../api/axiosClient";
+import { KeyIcon } from "@heroicons/react/24/outline";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -30,16 +31,16 @@ export default function ForgotPassword() {
 
       <div className="relative max-w-6xl mx-auto px-4 py-10">
         <Link to="/" className="inline-flex items-center gap-3">
-          <span className="h-3 w-3 rounded-full bg-rose-600 shadow shadow-rose-200" />
-          <span className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
-            ऐँचोपैंचो
-          </span>
+          <img src="/logo.png" alt="Logo" className="h-24 w-auto" />
         </Link>
 
         <div className="mt-10 mx-auto max-w-md">
           <div className="rounded-2xl border border-rose-100 bg-white shadow-sm p-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+              <KeyIcon className="h-6 w-6" />
+            </div>
             <h1 className="text-xl font-semibold text-gray-900">
-              💌 Forgot password
+              Forgot password
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               We’ll send you a reset link.
@@ -77,7 +78,7 @@ export default function ForgotPassword() {
                   disabled={submitting}
                   className="w-full py-2.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
                 >
-                  {submitting ? "Sending…" : "Send reset link 💖"}
+                  {submitting ? "Sending…" : "Send reset link"}
                 </button>
 
                 <div className="text-right">
