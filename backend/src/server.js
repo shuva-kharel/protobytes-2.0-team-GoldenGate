@@ -9,8 +9,8 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 // REMOVE xss-clean and express-mongo-sanitize for Express 5
-// const xssClean = require("xss-clean");               // ⛔ remove
-// const mongoSanitize = require("express-mongo-sanitize"); // ⛔ remove
+// const xssClean = require("xss-clean");
+// const mongoSanitize = require("express-mongo-sanitize");
 const hpp = require("hpp");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
@@ -33,16 +33,19 @@ const errorHandler = require("./middlewares/errorHandler");
 const logger = require("./utils/logger");
 const transporter = require("./config/mailer");
 
+// 👉 Optional: Raise default max listeners (useful in dev with nodemon/tools adding exit handlers)
+// require("events").EventEmitter.defaultMaxListeners = 30;
+
 const app = express();
 const server = http.createServer(app);
 
-// Trust proxy if behind NGINX/Heroku/Render
+// Trust proxy if behind NGINX/Heroku/Render/etc (needed for correct req.ip, secure cookies, etc.)
 app.set("trust proxy", 1);
 
 // CORS — be explicit; cookies need credentials: true
 app.use(
   cors({
-    origin: (process.env.CLIENT_ORIGIN || "http://localhost:3000").split(","),
+    origin: (process.env.CLIENT_ORIGIN || "http://localhost:5173").split(","),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -97,7 +100,7 @@ app.use((req, res, next) => {
   try {
     if (req.body && typeof req.body === "object") sanitizeKeysInPlace(req.body);
     if (req.params && typeof req.params === "object") sanitizeKeysInPlace(req.params);
-    if (req.query && typeof req.query === "object") sanitizeKeysInPlace(req.query); // mutate only
+    if (req.query && typeof req.query === "object") sanitizeKeysInPlace(req.query);
     next();
   } catch (e) {
     logger.error("Sanitizer error", { error: e.message });
@@ -145,7 +148,7 @@ transporter
 const PORT = process.env.PORT || 5000;
 const io = new Server(server, {
   cors: {
-    origin: (process.env.CLIENT_ORIGIN || "http://localhost:3000").split(","),
+    origin: (process.env.CLIENT_ORIGIN || "http://localhost:5173").split(","),
     credentials: true,
   },
 });

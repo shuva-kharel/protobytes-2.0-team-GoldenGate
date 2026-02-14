@@ -14,6 +14,14 @@ const {
 } = require("../utils/cookies");
 const logger = require("../utils/logger");
 
+// 🔔 Notification service (make sure you created src/services/notificationService.js)
+const {
+  sendLoginAlert,
+  sendTwoFactorChanged,
+  sendPasswordChanged,
+  sendSessionsRevoked,
+} = require("../services/notificationService");
+
 function createOtp(minutes = 10) {
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const otpExpiry = new Date(Date.now() + minutes * 60 * 1000);
@@ -235,6 +243,12 @@ const loginUser = async (req, res, next) => {
 
     if (!twoFactorEnabled) {
       const payload = await issueSessionTokens(req, res, user);
+      // 🔔 Email login alert
+      try {
+        await sendLoginAlert({ user, req });
+      } catch (e) {
+        console.error("Login alert email failed:", e.message);
+      }
       return res.json({
         ...payload,
         requires2FA: false,
@@ -319,6 +333,12 @@ const verify2FA = async (req, res, next) => {
     clear2FACookie(res);
 
     const payload = await issueSessionTokens(req, res, user);
+    // 🔔 Email login alert
+    try {
+      await sendLoginAlert({ user, req });
+    } catch (e) {
+      console.error("2FA login alert email failed:", e.message);
+    }
     return res.json({ ...payload, message: "Login successful" });
   } catch (err) {
     next(err);
@@ -388,6 +408,13 @@ const enableEmail2FA = async (req, res, next) => {
     };
     await user.save();
 
+    // 🔔 Notify
+    try {
+      await sendTwoFactorChanged({ user, enabled: true, method: "email" });
+    } catch (e) {
+      console.error("2FA enabled email failed:", e.message);
+    }
+
     res.json({ message: "Email 2FA enabled", twoFactor: getPublicTwoFactorConfig(user) });
   } catch (err) {
     next(err);
@@ -403,6 +430,8 @@ const startAuthenticatorSetup = async (req, res, next) => {
     const issuer = process.env.TOTP_ISSUER || "Ainchopaincho";
     const account = user.email || user.username;
     const otpauthUrl = buildOtpAuthUrl({ issuer, accountName: account, secret });
+
+    // ✅ ensure & not &amp; in query params
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(otpauthUrl)}`;
 
     user.twoFactor = {
@@ -446,6 +475,13 @@ const verifyAuthenticatorSetup = async (req, res, next) => {
     };
     await user.save();
 
+    // 🔔 Notify
+    try {
+      await sendTwoFactorChanged({ user, enabled: true, method: "authenticator" });
+    } catch (e) {
+      console.error("2FA enabled (auth) email failed:", e.message);
+    }
+
     res.json({ message: "Authenticator 2FA enabled", twoFactor: getPublicTwoFactorConfig(user) });
   } catch (err) {
     next(err);
@@ -465,6 +501,17 @@ const disable2FA = async (req, res, next) => {
       pendingAuthenticatorSecret: "",
     };
     await user.save();
+
+    // 🔔 Notify
+    try {
+      await sendTwoFactorChanged({
+        user,
+        enabled: false,
+        method: user.twoFactor?.method || "email",
+      });
+    } catch (e) {
+      console.error("2FA disabled email failed:", e.message);
+    }
 
     res.json({ message: "2FA disabled", twoFactor: getPublicTwoFactorConfig(user) });
   } catch (err) {
@@ -525,7 +572,7 @@ const forgotPassword = async (req, res, next) => {
     user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
 
-    // IMPORTANT: Build a correct URL (no HTML-escaped &amp;) and use Vite's default port when CLIENT_URL is missing.
+    // ✅ Build a correct URL (no &amp;) and use Vite's default port if CLIENT_URL not set
     const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
     const url = new URL("/reset-password", clientUrl);
     url.searchParams.set("token", resetTokenPlain);
@@ -595,6 +642,13 @@ const updatePassword = async (req, res, next) => {
       { user: user._id, revokedAt: null },
       { $set: { revokedAt: new Date(), revokeReason: "Password changed" } }
     );
+
+    // 🔔 Security email
+    try {
+      await sendPasswordChanged({ user, req });
+    } catch (e) {
+      console.error("Password changed email failed:", e.message);
+    }
 
     const payload = await issueSessionTokens(req, res, user);
 
@@ -682,6 +736,14 @@ const revokeSession = async (req, res, next) => {
     session.revokeReason = "User revoked";
     await session.save();
 
+    // 🔔 Notify
+    try {
+      const user = await User.findById(req.user._id).select("email fullName username notifications");
+      await sendSessionsRevoked({ user });
+    } catch (e) {
+      console.error("Sessions revoked email failed:", e.message);
+    }
+
     res.json({ message: "Session revoked" });
   } catch (err) {
     next(err);
@@ -704,6 +766,14 @@ const revokeOtherSessions = async (req, res, next) => {
       { $set: { revokedAt: now, revokeReason: "User revoked other sessions" } }
     );
 
+    // 🔔 Notify
+    try {
+      const user = await User.findById(req.user._id).select("email fullName username notifications");
+      await sendSessionsRevoked({ user });
+    } catch (e) {
+      console.error("Sessions revoked email failed:", e.message);
+    }
+
     res.json({ message: "Other sessions revoked" });
   } catch (err) {
     next(err);
@@ -718,6 +788,14 @@ const revokeAllSessions = async (req, res, next) => {
     );
 
     clearAuthCookies(res);
+
+    // 🔔 Notify
+    try {
+      const user = await User.findById(req.user._id).select("email fullName username notifications");
+      await sendSessionsRevoked({ user });
+    } catch (e) {
+      console.error("Sessions revoked email failed:", e.message);
+    }
 
     res.json({ message: "All sessions revoked" });
   } catch (err) {

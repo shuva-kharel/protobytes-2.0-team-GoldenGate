@@ -3,6 +3,7 @@ const Conversation = require("../models/Conversation");
 const ChatMessage = require("../models/ChatMessage");
 const Product = require("../models/Product");
 const User = require("../models/User");
+const { sendNewMessageNotification } = require("../services/notificationService");
 
 function toObjectId(id) {
   return new mongoose.Types.ObjectId(String(id));
@@ -19,7 +20,6 @@ function isConversationMember(conversation, userId) {
 
 async function findOrCreateConversation(currentUserId, targetUserId) {
   const participantKey = makeParticipantKey(currentUserId, targetUserId);
-
   let conversation = await Conversation.findOne({ participantKey });
   if (conversation) return conversation;
 
@@ -41,33 +41,30 @@ function mapConversation(conversation, currentUserId) {
     lastMessage: conversation.lastMessage || null,
     otherUser: other
       ? {
-          _id: other._id,
-          username: other.username,
-          fullName: other.fullName,
-          profilePicture: other.profilePicture,
-        }
+        _id: other._id,
+        username: other.username,
+        fullName: other.fullName,
+        profilePicture: other.profilePicture,
+      }
       : null,
   };
 }
 
+// 🔹 Send product message
 async function seedProductMessage({ conversation, senderId, productId, io }) {
   const product = await Product.findById(productId).lean();
-  if (!product) {
-    throw Object.assign(new Error("Product not found"), { statusCode: 404 });
-  }
+  if (!product) throw Object.assign(new Error("Product not found"), { statusCode: 404 });
 
   const ownerId = String(product?.uploadedBy?.user || "");
   const isParticipantOwner = conversation.participants.some((p) => String(p) === ownerId);
-  if (!isParticipantOwner) {
+  if (!isParticipantOwner)
     throw Object.assign(new Error("Product owner is not part of this chat"), { statusCode: 400 });
-  }
 
   const existingProductMessage = await ChatMessage.findOne({
     conversation: conversation._id,
     type: "product",
     "product.productId": product._id,
   }).lean();
-
   if (existingProductMessage) return null;
 
   const message = await ChatMessage.create({
@@ -103,6 +100,7 @@ async function seedProductMessage({ conversation, senderId, productId, io }) {
     .populate("sender", "username fullName profilePicture")
     .lean();
 
+  // 🔹 Emit only via socket
   if (io) {
     io.to(`conversation:${conversation._id}`).emit("chat:message:new", populated);
     conversation.participants.forEach((participantId) => {
@@ -112,78 +110,78 @@ async function seedProductMessage({ conversation, senderId, productId, io }) {
     });
   }
 
+  // Email notifications
+  try {
+    const participants = await User.find({ _id: { $in: conversation.participants } })
+      .select("_id email username fullName notifications")
+      .lean();
+
+    const sender = participants.find((u) => String(u._id) === String(senderId));
+    const receivers = participants.filter((u) => String(u._id) !== String(senderId));
+
+    await Promise.all(
+      receivers.map((receiver) =>
+        sendNewMessageNotification({
+          receiver,
+          sender,
+          message: populated,
+          conversation: { _id: conversation._id },
+        })
+      )
+    );
+  } catch (err) {
+    console.error("Email notify (product message) failed:", err.message);
+  }
+
   return populated;
 }
 
+// 🔹 Controller endpoints
 const getConversations = async (req, res) => {
   const conversations = await Conversation.find({ participants: req.user._id })
     .populate("participants", "username fullName profilePicture")
     .sort({ updatedAt: -1 });
 
-  res.json({
-    items: conversations.map((c) => mapConversation(c, req.user._id)),
-  });
+  res.json({ items: conversations.map((c) => mapConversation(c, req.user._id)) });
 };
 
 const getOrCreateConversationWithUser = async (req, res) => {
   const targetUserId = String(req.params.userId || "");
-  if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+  if (!mongoose.Types.ObjectId.isValid(targetUserId))
     return res.status(400).json({ message: "Invalid user id" });
-  }
-
-  if (String(req.user._id) === targetUserId) {
+  if (String(req.user._id) === targetUserId)
     return res.status(400).json({ message: "Cannot chat with yourself" });
-  }
 
   const targetUser = await User.findById(targetUserId).select("_id").lean();
-  if (!targetUser) {
-    return res.status(404).json({ message: "User not found" });
-  }
+  if (!targetUser) return res.status(404).json({ message: "User not found" });
 
   const conversation = await findOrCreateConversation(req.user._id, targetUserId);
-
   const io = req.app.locals.io;
   const productId = req.body?.productId || req.query?.productId;
-  if (productId) {
-    try {
-      await seedProductMessage({
-        conversation,
-        senderId: req.user._id,
-        productId,
-        io,
-      });
-    } catch (err) {
-      return res.status(err.statusCode || 400).json({ message: err.message || "Invalid product context" });
-    }
-  }
+
+  if (productId) await seedProductMessage({ conversation, senderId: req.user._id, productId, io });
 
   const fullConversation = await Conversation.findById(conversation._id)
     .populate("participants", "username fullName profilePicture")
     .lean();
 
-  res.json({
-    conversation: mapConversation(fullConversation, req.user._id),
-  });
+  res.json({ conversation: mapConversation(fullConversation, req.user._id) });
 };
 
 const getConversationMessages = async (req, res) => {
   const conversationId = req.params.conversationId;
-  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+  if (!mongoose.Types.ObjectId.isValid(conversationId))
     return res.status(400).json({ message: "Invalid conversation id" });
-  }
 
   const conversation = await Conversation.findById(conversationId).lean();
-  if (!conversation || !isConversationMember(conversation, req.user._id)) {
+  if (!conversation || !isConversationMember(conversation, req.user._id))
     return res.status(404).json({ message: "Conversation not found" });
-  }
 
   const limit = Math.min(Number(req.query.limit) || 50, 100);
   const before = req.query.before ? new Date(req.query.before) : null;
 
   const query = { conversation: conversation._id };
-  if (before && !Number.isNaN(before.getTime())) {
-    query.createdAt = { $lt: before };
-  }
+  if (before && !Number.isNaN(before.getTime())) query.createdAt = { $lt: before };
 
   const rows = await ChatMessage.find(query)
     .sort({ createdAt: -1 })
@@ -193,27 +191,21 @@ const getConversationMessages = async (req, res) => {
 
   rows.reverse();
 
-  res.json({
-    items: rows,
-    hasMore: rows.length === limit,
-  });
+  res.json({ items: rows, hasMore: rows.length === limit });
 };
 
+// 🔹 Send text message (emit only via socket)
 const sendMessage = async (req, res) => {
   const conversationId = req.params.conversationId;
-  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+  if (!mongoose.Types.ObjectId.isValid(conversationId))
     return res.status(400).json({ message: "Invalid conversation id" });
-  }
 
   const text = String(req.body?.text || "").trim();
-  if (!text) {
-    return res.status(400).json({ message: "Message text is required" });
-  }
+  if (!text) return res.status(400).json({ message: "Message text is required" });
 
   const conversation = await Conversation.findById(conversationId);
-  if (!conversation || !isConversationMember(conversation, req.user._id)) {
+  if (!conversation || !isConversationMember(conversation, req.user._id))
     return res.status(404).json({ message: "Conversation not found" });
-  }
 
   const message = await ChatMessage.create({
     conversation: conversation._id,
@@ -245,12 +237,25 @@ const sendMessage = async (req, res) => {
     });
   }
 
-  res.status(201).json({ message: populated });
+  // Email notifications
+  try {
+    const participants = await User.find({ _id: { $in: conversation.participants } })
+      .select("_id email username fullName notifications")
+      .lean();
+
+    const sender = participants.find((u) => String(u._id) === String(req.user._id));
+    const receivers = participants.filter((u) => String(u._id) !== String(req.user._id));
+
+    await Promise.all(
+      receivers.map((receiver) =>
+        sendNewMessageNotification({ receiver, sender, message: populated, conversation: { _id: conversation._id } })
+      )
+    );
+  } catch (err) {
+    console.error("Email notify failed:", err.message);
+  }
+
+  res.status(201).json({ ok: true }); // do NOT return the message; socket handles it
 };
 
-module.exports = {
-  getConversations,
-  getOrCreateConversationWithUser,
-  getConversationMessages,
-  sendMessage,
-};
+module.exports = { getConversations, getOrCreateConversationWithUser, getConversationMessages, sendMessage };

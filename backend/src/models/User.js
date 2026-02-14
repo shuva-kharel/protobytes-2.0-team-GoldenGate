@@ -52,6 +52,14 @@ const userSchema = new mongoose.Schema(
       publicId: { type: String, default: "" },
     },
     bio: { type: String, default: "" },
+
+    // 🔔 Notification preferences
+    notifications: {
+      newMessageEmail: { type: Boolean, default: true },
+      loginAlertEmail: { type: Boolean, default: true },
+      twoFactorEmail: { type: Boolean, default: true },
+      securityEmail: { type: Boolean, default: true }, // password/session alerts
+    },
   },
   { timestamps: true }
 );

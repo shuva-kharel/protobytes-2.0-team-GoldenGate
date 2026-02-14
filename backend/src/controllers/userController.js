@@ -105,8 +105,38 @@ const getPublicProfileByUsername = async (req, res, next) => {
   }
 };
 
+const updateNotificationPrefs = async (req, res, next) => {
+  try {
+    const allowed = ["newMessageEmail", "loginAlertEmail", "twoFactorEmail", "securityEmail"];
+    const patch = {};
+    for (const key of allowed) {
+      if (typeof req.body?.[key] === "boolean") patch[`notifications.${key}`] = req.body[key];
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: patch },
+      { new: true, select: "notifications" }
+    );
+    res.json({ notifications: user.notifications });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getNotificationPrefs = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select("notifications").lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ notifications: user.notifications || {} });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   updateProfile,
   getPublicProfileById,
   getPublicProfileByUsername,
+  updateNotificationPrefs,
+  getNotificationPrefs,
 };

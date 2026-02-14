@@ -1,0 +1,21 @@
+<h2 style="margin:0 0 12px 0">{{appName}}</h2>
+<p>Hi {{receiverName}},</p>
+<p><strong>{{senderName}}</strong> sent you a new message:</p>
+<blockquote style="margin:12px 0;padding:12px;border-left:4px solid #f43f5e;background:#fff1f2">
+  {{preview}}
+</blockquote>
+
+{{#if product}}
+  <p><strong>Product:</strong> {{product.name}}
+    {{#if product.price}} — Rs {{product.price}}{{/if}}
+    {{#if product.location}} — {{product.location}}{{/if}}
+  </p>
+  {{#if product.imageUrl}}
+    <p><img src="{{product.imageUrl}}" alt="Product" height="120" style="border-radius:8px"/></p>
+  {{/if}}
+{{/if}}
+
+<p><a href="{{link}}" style="color:#f43f5e;">Open conversation</a></p>
+<hr style="border:none;border-top:1px solid #fee2e2;margin:16px 0"/>
+<small>You’re receiving this because message notifications are enabled.</small>
+{{> footer}}

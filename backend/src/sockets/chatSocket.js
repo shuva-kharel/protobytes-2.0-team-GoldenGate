@@ -40,7 +40,9 @@ function registerChatSocket(io) {
       if (!token) return next(new Error("Not authorized"));
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id).select("_id username fullName profilePicture role").lean();
+      const user = await User.findById(decoded.id)
+        .select("_id username fullName profilePicture role")
+        .lean();
       if (!user) return next(new Error("Not authorized"));
 
       socket.user = user;
@@ -106,6 +108,7 @@ function registerChatSocket(io) {
           .populate("sender", "username fullName profilePicture")
           .lean();
 
+        // 🔹 Single emission
         io.to(`conversation:${conversation._id}`).emit("chat:message:new", populated);
         conversation.participants.forEach((participantId) => {
           io.to(`user:${participantId}`).emit("chat:conversation:updated", {
@@ -113,7 +116,7 @@ function registerChatSocket(io) {
           });
         });
 
-        if (typeof ack === "function") ack({ ok: true, message: populated });
+        if (typeof ack === "function") ack({ ok: true });
       } catch (err) {
         if (typeof ack === "function") ack({ ok: false, error: err.message || "Message send failed" });
       }
