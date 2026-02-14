@@ -100,14 +100,10 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-rose-100 bg-white/75 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
         <Link to="/home" className="flex items-center gap-3 group">
-          {/* Brand Mark (optional simple dot) */}
-          <span className="h-3 w-3 rounded-full bg-rose-600 shadow shadow-rose-200 group-hover:scale-110 transition" />
-          {/* Nepali brand */}
-          <span className="text-xl font-extrabold font-display brand-gradient tracking-wide">
-            ऐँचोपैंचो
-          </span>
+          {/* Logo */}
+          <img src="/logo.png" alt="Logo" className="h-14 w-auto" />
         </Link>
 
         <nav className="flex items-center gap-4">

@@ -25,6 +25,10 @@ export default {
       boxShadow: {
         glow: "0 0 25px rgba(244, 63, 94, 0.35)",
       },
+      fontFamily: {
+        sans: ["Poppins", "sans-serif"],
+        display: ["Poppins", "sans-serif"],
+      },
     },
   },
   plugins: [],

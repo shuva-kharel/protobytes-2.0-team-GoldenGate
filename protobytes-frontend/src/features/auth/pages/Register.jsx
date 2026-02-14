@@ -52,7 +52,7 @@ export default function Register() {
         password: form.password,
       });
 
-      setSuccess("Registered! OTP sent to your email 💌 Redirecting…");
+      setSuccess("Registered! OTP sent to your email. Redirecting…");
 
       setTimeout(() => {
         navigate(
@@ -71,14 +71,11 @@ export default function Register() {
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <Link to="/" className="inline-flex items-center gap-3">
-            <span className="h-3 w-3 rounded-full bg-rose-600 shadow shadow-rose-200" />
-            <span className="text-3xl font-extrabold font-display brand-gradient tracking-wide">
-              ऐँचोपैंचो
-            </span>
+            <img src="/logo.png" alt="Logo" className="h-24 w-auto" />
           </Link>
 
           <h1 className="text-3xl font-extrabold text-rose-700 drop-shadow">
-            💘 Create your account
+            Create your account
           </h1>
           <p className="mt-2 text-rose-600">
             Join the lending & borrowing community — safely.
@@ -134,7 +131,7 @@ export default function Register() {
             )}
 
             <Button className="w-full" disabled={loading} type="submit">
-              {loading ? "Creating account…" : "Create Account 💖"}
+              {loading ? "Creating account…" : "Create Account"}
             </Button>
           </form>
 

@@ -3,16 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --brand-gradient: linear-gradient(
-    135deg,
-    #f43f5e 0%,
-    #fb7185 40%,
-    #fb923c 100%
-  );
+  --brand-gradient: linear-gradient(135deg,
+      #f43f5e 0%,
+      #fb7185 40%,
+      #fb923c 100%);
 }
 
 .font-display {
   font-family:
+    Poppins,
     "Noto Sans Devanagari",
     system-ui,
     -apple-system,
@@ -35,7 +34,7 @@
 
 body {
   font-family:
-    Inter,
+    Poppins,
     system-ui,
     -apple-system,
     Segoe UI,
@@ -87,9 +86,11 @@ a {
     transform: translate3d(0, -6vh, 0) rotate(0deg);
     opacity: 0;
   }
+
   12% {
     opacity: 0.75;
   }
+
   100% {
     transform: translate3d(15px, 112vh, 0) rotate(360deg);
     opacity: 0;
