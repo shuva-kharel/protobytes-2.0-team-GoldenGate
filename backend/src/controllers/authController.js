@@ -525,8 +525,12 @@ const forgotPassword = async (req, res, next) => {
     user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
 
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
-    const resetLink = `${clientUrl}/reset-password?token=${resetTokenPlain}&email=${encodeURIComponent(user.email)}`;
+    // IMPORTANT: Build a correct URL (no HTML-escaped &amp;) and use Vite's default port when CLIENT_URL is missing.
+    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const url = new URL("/reset-password", clientUrl);
+    url.searchParams.set("token", resetTokenPlain);
+    url.searchParams.set("email", user.email);
+    const resetLink = url.toString();
 
     try {
       await sendEmail(user.email, "Reset your password", "resetPassword", {

@@ -46,7 +46,13 @@ body {
     "Apple Color Emoji",
     "Segoe UI Emoji";
   color: #0f172a;
-  background: radial-gradient(circle at top left, #ffe4e6 0%, #fff 28%, #fff 72%, #ffe4e6 100%);
+  background: radial-gradient(
+    circle at top left,
+    #ffe4e6 0%,
+    #fff 28%,
+    #fff 72%,
+    #ffe4e6 100%
+  );
   min-height: 100vh;
 }
 

@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation, useParams, Link } from "react-router-dom";
 import { axiosClient } from "../../../api/axiosClient";
 
+/* Extract query params safely */
 function useQuery() {
   const { search } = useLocation();
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
+/** Read a query param, with fallback for legacy `&amp;email=` links */
+function getQueryWithAmpFallback(query, key) {
+  return query.get(key) || query.get(`amp;${key}`) || "";
+}
+
 function Toast({ type = "info", message = "", onClose }) {
   if (!message) return null;
+
   const color =
     type === "success"
       ? "bg-emerald-600"
@@ -17,6 +24,7 @@ function Toast({ type = "info", message = "", onClose }) {
         : type === "warning"
           ? "bg-amber-600"
           : "bg-slate-700";
+
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60]">
       <div
@@ -26,6 +34,7 @@ function Toast({ type = "info", message = "", onClose }) {
         <button
           className="text-white/80 hover:text-white text-xs"
           onClick={onClose}
+          aria-label="Close"
         >
           ✕
         </button>
@@ -37,36 +46,38 @@ function Toast({ type = "info", message = "", onClose }) {
 export default function ResetPassword() {
   const navigate = useNavigate();
   const query = useQuery();
+  const { token: paramToken } = useParams();
 
-  const token = query.get("token") || "";
-  const encodedEmail = query.get("email") || "";
-  const email = useMemo(() => {
-    try {
-      return decodeURIComponent(encodedEmail);
-    } catch {
-      return encodedEmail;
-    }
-  }, [encodedEmail]);
+  // Support both route param and query param
+  const token = paramToken || query.get("token") || "";
+  const emailParam = getQueryWithAmpFallback(query, "email");
 
-  const hasParams = Boolean(token && email);
+  const hasToken = Boolean(token);
+  const hasEmail = Boolean(emailParam);
 
   const [form, setForm] = useState({
+    email: "",
     newPassword: "",
     confirmPassword: "",
     showNew: false,
     showConfirm: false,
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ type: "", message: "" });
 
   useEffect(() => {
-    if (!hasParams) {
+    if (!hasToken) {
       setToast({
         type: "error",
         message: "Invalid or missing reset link. Please request a new one.",
       });
     }
-  }, [hasParams]);
+    // Prefill email for display (read-only)
+    if (emailParam) {
+      setForm((f) => ({ ...f, email: emailParam }));
+    }
+  }, [hasToken, emailParam]);
 
   const passwordChecks = useMemo(() => {
     const p = form.newPassword || "";
@@ -77,11 +88,17 @@ export default function ResetPassword() {
     };
   }, [form.newPassword]);
 
+  const passwordsMatch =
+    form.newPassword &&
+    form.confirmPassword &&
+    form.newPassword === form.confirmPassword;
+
   const canSubmit =
-    form.newPassword.length >= 8 &&
-    form.newPassword === form.confirmPassword &&
+    passwordChecks.length &&
+    passwordsMatch &&
     !submitting &&
-    hasParams;
+    hasToken &&
+    hasEmail;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -89,24 +106,27 @@ export default function ResetPassword() {
 
     try {
       setSubmitting(true);
+
       await axiosClient.post("/auth/reset-password", {
-        email,
         token,
-        newPassword: form.newPassword,
+        email: emailParam,
+        password: form.newPassword,
       });
 
       setToast({
         type: "success",
         message: "Password reset successful! Redirecting to login…",
       });
+
       setTimeout(() => navigate("/login"), 1200);
     } catch (err) {
       console.error(err);
+
       setToast({
         type: "error",
         message:
           err?.response?.data?.message ||
-          "Failed to reset password. Try again.",
+          "Reset link expired or invalid. Please request a new one.",
       });
     } finally {
       setSubmitting(false);
@@ -121,7 +141,7 @@ export default function ResetPassword() {
         onClose={() => setToast({ type: "", message: "" })}
       />
 
-      {/* Soft gradient background */}
+      {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-rose-50 via-white to-orange-50" />
       <div className="absolute -top-20 -right-16 h-72 w-72 bg-rose-100 rounded-full blur-3xl opacity-60" />
       <div className="absolute -bottom-24 -left-16 h-64 w-64 bg-orange-100 rounded-full blur-3xl opacity-60" />
@@ -139,14 +159,8 @@ export default function ResetPassword() {
             <h1 className="text-xl font-semibold text-gray-900">
               Reset your password
             </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {hasParams
-                ? `for ${email}`
-                : "This link seems invalid or expired. Please request a new reset link."}
-            </p>
 
-            {/* If params are missing, show fallback */}
-            {!hasParams ? (
+            {!hasToken ? (
               <div className="mt-6">
                 <Link
                   to="/forgot-password"
@@ -157,6 +171,21 @@ export default function ResetPassword() {
               </div>
             ) : (
               <form onSubmit={submit} className="mt-6 space-y-4">
+                {/* Email (read-only) */}
+                {hasEmail && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Account
+                    </label>
+                    <input
+                      type="email"
+                      value={emailParam}
+                      readOnly
+                      className="mt-1 w-full border rounded-lg p-3 bg-gray-50 text-gray-700 cursor-not-allowed"
+                    />
+                  </div>
+                )}
+
                 {/* New Password */}
                 <div>
                   <label className="text-sm font-medium text-gray-700">
@@ -183,7 +212,7 @@ export default function ResetPassword() {
                       {form.showNew ? "Hide" : "Show"}
                     </button>
                   </div>
-                  {/* Strength hints */}
+
                   <ul className="mt-2 text-xs text-gray-600 space-y-1">
                     <li
                       className={
@@ -238,18 +267,18 @@ export default function ResetPassword() {
                       {form.showConfirm ? "Hide" : "Show"}
                     </button>
                   </div>
-                  {form.confirmPassword &&
-                    form.newPassword !== form.confirmPassword && (
-                      <p className="text-xs text-rose-600 mt-1">
-                        Passwords don’t match.
-                      </p>
-                    )}
+
+                  {form.confirmPassword && !passwordsMatch && (
+                    <p className="text-xs text-rose-600 mt-1">
+                      Passwords don’t match.
+                    </p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className={`w-full py-2.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60`}
+                  className="w-full py-2.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
                 >
                   {submitting ? "Resetting…" : "Reset Password"}
                 </button>
